@@ -1,0 +1,45 @@
+<div class="flex items-center justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Reuniões</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Acompanhe a transcrição e o resumo de cada reunião enviada.
+    </p>
+  </div>
+  <p-button label="Nova reunião" icon="pi pi-upload" routerLink="/upload" />
+</div>
+
+<div class="mt-6">
+  @if (loading()) {
+    <app-loading-state message="Carregando reuniões..." />
+  } @else if (errorMessage(); as message) {
+    <app-error-state [message]="message" (retry)="load()" />
+  } @else if (meetings().length === 0) {
+    <div
+      class="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 py-16 text-center dark:border-slate-700"
+    >
+      <p class="text-slate-500 dark:text-slate-400">Nenhuma reunião enviada ainda.</p>
+      <p-button label="Enviar a primeira reunião" icon="pi pi-upload" routerLink="/upload" />
+    </div>
+  } @else {
+    <ul class="flex flex-col gap-3">
+      @for (meeting of meetings(); track meeting.id) {
+        <li
+          class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="min-w-0">
+            <p class="truncate font-medium text-slate-900 dark:text-slate-100">{{ meeting.title }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Enviada em {{ meeting.uploadedAt | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <app-meeting-status-badge [status]="meeting.status" />
+            @if (actionFor(meeting); as action) {
+              <p-button [label]="action.label" size="small" severity="secondary" outlined="true" [routerLink]="action.link" />
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</div>
