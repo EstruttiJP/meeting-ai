@@ -38,10 +38,11 @@ public class GeminiSummaryProvider extends AbstractLlmSummaryProvider implements
 		String prompt = buildPrompt(transcriptionText);
 		GeminiResponse response;
 		try {
+			// Chave vai no header, não na query string: exceções de HTTP client costumam
+			// incluir a URI da requisição na mensagem, e isso pode acabar em log.
 			response = restClient.post()
-					.uri(uriBuilder -> uriBuilder.path("/models/{model}:generateContent")
-							.queryParam("key", apiKey)
-							.build(model))
+					.uri("/models/{model}:generateContent", model)
+					.header("x-goog-api-key", apiKey)
 					.contentType(MediaType.APPLICATION_JSON)
 					.body(new GeminiRequest(List.of(new GeminiContent(List.of(new GeminiPart(prompt))))))
 					.retrieve()

@@ -18,9 +18,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class GeminiSummaryProviderTest {
@@ -52,6 +55,7 @@ class GeminiSummaryProviderTest {
 				""";
 		mockServer.expect(requestTo(containsString(":generateContent")))
 				.andExpect(method(HttpMethod.POST))
+				.andExpect(header("x-goog-api-key", "user-api-key"))
 				.andRespond(withSuccess(geminiResponse(innerJson), MediaType.APPLICATION_JSON));
 
 		SummaryContent content = provider.summarize("transcrição", "user-api-key");
@@ -59,6 +63,24 @@ class GeminiSummaryProviderTest {
 		assertThat(content.summary()).isEqualTo("Reunião de descoberta");
 		assertThat(content.nextSteps()).containsExactly("Enviar proposta");
 		assertThat(content.objections()).containsExactly("Preço alto");
+	}
+
+	@Test
+	void apiKeyNeverAppearsInRequestUriOrFailureMessage() {
+		mockServer.expect(requestTo(containsString(":generateContent")))
+				.andRespond(withServerError());
+
+		assertThatThrownBy(() -> provider.summarize("transcrição", "user-api-key"))
+				.isInstanceOf(SummaryGenerationException.class)
+				.satisfies(ex -> assertThat(rootMessageChain(ex)).doesNotContain("user-api-key"));
+	}
+
+	private String rootMessageChain(Throwable throwable) {
+		StringBuilder chain = new StringBuilder();
+		for (Throwable current = throwable; current != null; current = current.getCause()) {
+			chain.append(current.getMessage()).append(" | ");
+		}
+		return chain.toString();
 	}
 
 	private String geminiResponse(String text) {
