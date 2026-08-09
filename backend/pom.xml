@@ -45,6 +45,13 @@
 			<artifactId>reactive-streams</artifactId>
 		</dependency>
 		<dependency>
+			<!-- Spring Boot 4 usa Jackson 3 (groupId tools.jackson.core) — mesma versão
+			     que o Boot autoconfigura como bean ObjectMapper, mas em compile scope
+			     explícito porque só vem transitivo (via flyway) hoje. -->
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>

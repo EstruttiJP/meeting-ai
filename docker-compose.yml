@@ -72,6 +72,7 @@ services:
       GOOGLE_CLIENT_SECRET:
       APP_ENCRYPTION_KEY:
       APP_ENCRYPTION_SALT:
+      OPENROUTER_API_KEY:
     volumes:
       - ./backend:/app
       - backend-m2:/root/.m2
