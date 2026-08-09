@@ -91,6 +91,14 @@ public class Meeting {
 		this.sentToCrmAt = Instant.now();
 	}
 
+	public void markExpired() {
+		this.status = MeetingStatus.EXPIRED;
+	}
+
+	public void scheduleExpiration(Instant expiresAt) {
+		this.expiresAt = expiresAt;
+	}
+
 	public UUID getId() {
 		return id;
 	}

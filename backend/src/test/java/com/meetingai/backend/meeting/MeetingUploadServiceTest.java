@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class MeetingUploadServiceTest {
 
 	private static final long MAX_FILE_SIZE_MB = 1;
+	private static final long RETENTION_DAYS = 7;
 
 	@Mock
 	private MeetingRepository meetingRepository;
@@ -42,7 +43,8 @@ class MeetingUploadServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		meetingUploadService = new MeetingUploadService(meetingRepository, usageQuotaService, storageService, MAX_FILE_SIZE_MB);
+		meetingUploadService = new MeetingUploadService(meetingRepository, usageQuotaService, storageService,
+				MAX_FILE_SIZE_MB, RETENTION_DAYS);
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 	}
 
@@ -56,6 +58,9 @@ class MeetingUploadServiceTest {
 		assertThat(meeting.getStatus()).isEqualTo(MeetingStatus.UPLOADED);
 		assertThat(meeting.getOriginalFilename()).isEqualTo("reuniao.mp3");
 		assertThat(meeting.getStorageKey()).contains("reuniao.mp3");
+		assertThat(meeting.getExpiresAt())
+				.isAfter(java.time.Instant.now().plus(RETENTION_DAYS - 1, java.time.temporal.ChronoUnit.DAYS))
+				.isBefore(java.time.Instant.now().plus(RETENTION_DAYS + 1, java.time.temporal.ChronoUnit.DAYS));
 		verify(usageQuotaService).consumeUploadSlot(user);
 		verify(storageService).store(anyString(), any(), anyLong(), anyString());
 	}

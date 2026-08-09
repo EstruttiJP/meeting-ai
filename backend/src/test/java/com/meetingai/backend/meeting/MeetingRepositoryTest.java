@@ -1,5 +1,7 @@
 package com.meetingai.backend.meeting;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,29 @@ class MeetingRepositoryTest {
 		assertThat(found).hasSize(1);
 		assertThat(found.get(0).getStatus()).isEqualTo(MeetingStatus.UPLOADED);
 		assertThat(found.get(0).getUploadedAt()).isNotNull();
+	}
+
+	@Test
+	void findsOverdueMeetingsExcludingAlreadyExpiredOnes() {
+		User user = userRepository.saveAndFlush(
+				new User("google-sub-expiration", "expiration@meetingai.com", "Expiration User", null));
+
+		Meeting overdue = new Meeting(user, "Reunião vencida", "a.mp3", "meetings/a.mp3");
+		overdue.scheduleExpiration(Instant.now().minus(1, ChronoUnit.DAYS));
+		meetingRepository.saveAndFlush(overdue);
+
+		Meeting notYetDue = new Meeting(user, "Reunião recente", "b.mp3", "meetings/b.mp3");
+		notYetDue.scheduleExpiration(Instant.now().plus(5, ChronoUnit.DAYS));
+		meetingRepository.saveAndFlush(notYetDue);
+
+		Meeting alreadyExpired = new Meeting(user, "Reunião já expirada", "c.mp3", "meetings/c.mp3");
+		alreadyExpired.scheduleExpiration(Instant.now().minus(10, ChronoUnit.DAYS));
+		alreadyExpired.markExpired();
+		meetingRepository.saveAndFlush(alreadyExpired);
+
+		List<Meeting> found = meetingRepository.findByStatusNotAndExpiresAtBefore(MeetingStatus.EXPIRED, Instant.now());
+
+		assertThat(found).extracting(Meeting::getId).containsExactly(overdue.getId());
 	}
 
 }

@@ -2,6 +2,8 @@ package com.meetingai.backend.meeting;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -30,15 +32,18 @@ public class MeetingUploadService {
 	private final UsageQuotaService usageQuotaService;
 	private final StorageService storageService;
 	private final long maxFileSizeBytes;
+	private final long retentionDays;
 
 	public MeetingUploadService(MeetingRepository meetingRepository,
 			UsageQuotaService usageQuotaService,
 			StorageService storageService,
-			@Value("${app.meeting.max-file-size-mb}") long maxFileSizeMb) {
+			@Value("${app.meeting.max-file-size-mb}") long maxFileSizeMb,
+			@Value("${app.meeting.retention-days}") long retentionDays) {
 		this.meetingRepository = meetingRepository;
 		this.usageQuotaService = usageQuotaService;
 		this.storageService = storageService;
 		this.maxFileSizeBytes = maxFileSizeMb * 1024 * 1024;
+		this.retentionDays = retentionDays;
 	}
 
 	@Transactional
@@ -57,7 +62,11 @@ public class MeetingUploadService {
 			throw new StorageException("Falha ao ler o arquivo enviado", e);
 		}
 
-		return meetingRepository.save(new Meeting(user, title, originalFilename, storageKey));
+		Meeting meeting = new Meeting(user, title, originalFilename, storageKey);
+		// Vida útil do áudio bruto começa a contar do upload, não do fim do pipeline —
+		// mesmo uma reunião que trava em TRANSCRIBING deve expirar depois de N dias.
+		meeting.scheduleExpiration(Instant.now().plus(retentionDays, ChronoUnit.DAYS));
+		return meetingRepository.save(meeting);
 	}
 
 	private void validateFormat(String originalFilename) {
