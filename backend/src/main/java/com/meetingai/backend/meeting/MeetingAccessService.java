@@ -1,5 +1,6 @@
 package com.meetingai.backend.meeting;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -18,6 +19,10 @@ public class MeetingAccessService {
 
 	public MeetingAccessService(MeetingRepository meetingRepository) {
 		this.meetingRepository = meetingRepository;
+	}
+
+	public List<Meeting> listForUser(User user) {
+		return meetingRepository.findByUserId(user.getId());
 	}
 
 	public Meeting getOwnedMeeting(User user, UUID meetingId) {

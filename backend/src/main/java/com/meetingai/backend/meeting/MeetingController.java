@@ -24,18 +24,23 @@ public class MeetingController {
 	private final CurrentUserService currentUserService;
 	private final MeetingUploadService meetingUploadService;
 	private final MeetingPipelineService meetingPipelineService;
+	private final MeetingAccessService meetingAccessService;
 
 	public MeetingController(CurrentUserService currentUserService, MeetingUploadService meetingUploadService,
-			MeetingPipelineService meetingPipelineService) {
+			MeetingPipelineService meetingPipelineService, MeetingAccessService meetingAccessService) {
 		this.currentUserService = currentUserService;
 		this.meetingUploadService = meetingUploadService;
 		this.meetingPipelineService = meetingPipelineService;
+		this.meetingAccessService = meetingAccessService;
 	}
 
 	@GetMapping
 	public ResponseEntity<List<MeetingResponse>> list() {
-		// TODO: item de escopo separado (listagem + paginação do dashboard).
-		return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+		User user = currentUserService.getCurrentUser();
+		List<MeetingResponse> responses = meetingAccessService.listForUser(user).stream()
+				.map(MeetingResponse::from)
+				.toList();
+		return ResponseEntity.ok(responses);
 	}
 
 	@PostMapping(consumes = "multipart/form-data")
@@ -49,8 +54,9 @@ public class MeetingController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<MeetingResponse> get(@PathVariable UUID id) {
-		// TODO: item de escopo separado (detalhe/status da reunião).
-		return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+		User user = currentUserService.getCurrentUser();
+		Meeting meeting = meetingAccessService.getOwnedMeeting(user, id);
+		return ResponseEntity.ok(MeetingResponse.from(meeting));
 	}
 
 }

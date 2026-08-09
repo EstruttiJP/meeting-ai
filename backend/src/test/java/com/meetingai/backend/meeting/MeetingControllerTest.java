@@ -44,17 +44,46 @@ class MeetingControllerTest {
 	@MockitoBean
 	private MeetingPipelineService meetingPipelineService;
 
+	@MockitoBean
+	private MeetingAccessService meetingAccessService;
+
 	private final User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 
 	@Test
-	void listIsNotImplementedYet() {
-		assertThat(mockMvc.get().uri("/api/meetings")).hasStatus(HttpStatus.NOT_IMPLEMENTED);
+	void listReturnsUsersMeetings() {
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		given(meetingAccessService.listForUser(user)).willReturn(java.util.List.of(meeting));
+
+		assertThat(mockMvc.get().uri("/api/meetings"))
+				.hasStatusOk()
+				.bodyJson()
+				.extractingPath("$[0].title")
+				.isEqualTo("Reunião de vendas");
 	}
 
 	@Test
-	void getByIdIsNotImplementedYet() {
-		assertThat(mockMvc.get().uri("/api/meetings/{id}", UUID.randomUUID()))
-				.hasStatus(HttpStatus.NOT_IMPLEMENTED);
+	void getByIdReturnsOwnedMeeting() {
+		UUID id = UUID.randomUUID();
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		given(meetingAccessService.getOwnedMeeting(user, id)).willReturn(meeting);
+
+		assertThat(mockMvc.get().uri("/api/meetings/{id}", id))
+				.hasStatusOk()
+				.bodyJson()
+				.extractingPath("$.status")
+				.isEqualTo("UPLOADED");
+	}
+
+	@Test
+	void getByIdOfMeetingNotOwnedReturnsNotFound() {
+		UUID id = UUID.randomUUID();
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		given(meetingAccessService.getOwnedMeeting(user, id)).willThrow(new MeetingNotFoundException(id));
+
+		assertThat(mockMvc.get().uri("/api/meetings/{id}", id))
+				.hasStatus(HttpStatus.NOT_FOUND);
 	}
 
 	@Test

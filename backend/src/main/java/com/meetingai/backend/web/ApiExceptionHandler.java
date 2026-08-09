@@ -16,6 +16,7 @@ import com.meetingai.backend.meeting.MeetingNotFoundException;
 import com.meetingai.backend.meeting.UnsupportedMeetingFormatException;
 import com.meetingai.backend.summary.SummaryNotApprovedException;
 import com.meetingai.backend.summary.SummaryNotFoundException;
+import com.meetingai.backend.transcription.TranscriptionNotFoundException;
 import com.meetingai.backend.usagequota.UsageQuotaExceededException;
 
 /**
@@ -65,6 +66,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(SummaryNotApprovedException.class)
 	public ProblemDetail handleSummaryNotApproved(SummaryNotApprovedException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(TranscriptionNotFoundException.class)
+	public ProblemDetail handleTranscriptionNotFound(TranscriptionNotFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
 	/**
