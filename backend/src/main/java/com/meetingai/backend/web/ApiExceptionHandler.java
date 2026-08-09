@@ -11,7 +11,9 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.meetingai.backend.aiprovider.AiProviderConfigNotFoundException;
 import com.meetingai.backend.meeting.MeetingFileTooLargeException;
+import com.meetingai.backend.meeting.MeetingNotFoundException;
 import com.meetingai.backend.meeting.UnsupportedMeetingFormatException;
+import com.meetingai.backend.summary.SummaryNotFoundException;
 import com.meetingai.backend.usagequota.UsageQuotaExceededException;
 
 /**
@@ -40,6 +42,16 @@ public class ApiExceptionHandler {
 
 	@ExceptionHandler(AiProviderConfigNotFoundException.class)
 	public ProblemDetail handleAiProviderConfigNotFound(AiProviderConfigNotFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler(MeetingNotFoundException.class)
+	public ProblemDetail handleMeetingNotFound(MeetingNotFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler(SummaryNotFoundException.class)
+	public ProblemDetail handleSummaryNotFound(SummaryNotFoundException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
