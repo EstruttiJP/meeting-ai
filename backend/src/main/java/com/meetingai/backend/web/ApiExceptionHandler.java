@@ -14,6 +14,7 @@ import com.meetingai.backend.crm.CrmConnectionException;
 import com.meetingai.backend.meeting.MeetingFileTooLargeException;
 import com.meetingai.backend.meeting.MeetingNotFoundException;
 import com.meetingai.backend.meeting.UnsupportedMeetingFormatException;
+import com.meetingai.backend.summary.SummaryNotApprovedException;
 import com.meetingai.backend.summary.SummaryNotFoundException;
 import com.meetingai.backend.usagequota.UsageQuotaExceededException;
 
@@ -59,6 +60,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(CrmConnectionException.class)
 	public ProblemDetail handleCrmConnectionFailure(CrmConnectionException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	@ExceptionHandler(SummaryNotApprovedException.class)
+	public ProblemDetail handleSummaryNotApproved(SummaryNotApprovedException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
 	}
 
 	/**

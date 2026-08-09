@@ -86,6 +86,11 @@ public class Meeting {
 		this.status = MeetingStatus.FAILED;
 	}
 
+	public void markSentToCrm() {
+		this.status = MeetingStatus.SENT_TO_CRM;
+		this.sentToCrmAt = Instant.now();
+	}
+
 	public UUID getId() {
 		return id;
 	}

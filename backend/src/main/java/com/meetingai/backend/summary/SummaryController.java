@@ -2,7 +2,6 @@ package com.meetingai.backend.summary;
 
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.meetingai.backend.crm.CrmSyncService;
 import com.meetingai.backend.security.CurrentUserService;
 import com.meetingai.backend.user.User;
 
@@ -23,10 +23,13 @@ public class SummaryController {
 
 	private final CurrentUserService currentUserService;
 	private final SummaryService summaryService;
+	private final CrmSyncService crmSyncService;
 
-	public SummaryController(CurrentUserService currentUserService, SummaryService summaryService) {
+	public SummaryController(CurrentUserService currentUserService, SummaryService summaryService,
+			CrmSyncService crmSyncService) {
 		this.currentUserService = currentUserService;
 		this.summaryService = summaryService;
+		this.crmSyncService = crmSyncService;
 	}
 
 	@GetMapping
@@ -44,8 +47,9 @@ public class SummaryController {
 
 	@PostMapping("/send-to-crm")
 	public ResponseEntity<Void> sendToCrm(@PathVariable UUID meetingId) {
-		// TODO: requer integração Pipedrive.
-		return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+		User user = currentUserService.getCurrentUser();
+		crmSyncService.sendApprovedSummaryToCrm(user, meetingId);
+		return ResponseEntity.noContent().build();
 	}
 
 }

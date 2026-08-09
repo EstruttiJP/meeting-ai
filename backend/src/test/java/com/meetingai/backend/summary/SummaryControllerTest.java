@@ -14,6 +14,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
+import com.meetingai.backend.crm.CrmConnectionException;
+import com.meetingai.backend.crm.CrmSyncService;
 import com.meetingai.backend.security.CurrentUserService;
 import com.meetingai.backend.user.User;
 
@@ -38,6 +40,9 @@ class SummaryControllerTest {
 
 	@MockitoBean
 	private SummaryService summaryService;
+
+	@MockitoBean
+	private CrmSyncService crmSyncService;
 
 	private final User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 
@@ -112,9 +117,34 @@ class SummaryControllerTest {
 	}
 
 	@Test
-	void sendToCrmIsNotImplementedYet() {
-		assertThat(mockMvc.post().uri("/api/meetings/{id}/summary/send-to-crm", UUID.randomUUID()))
-				.hasStatus(HttpStatus.NOT_IMPLEMENTED);
+	void sendToCrmDelegatesToCrmSyncServiceAndReturnsNoContent() {
+		UUID meetingId = UUID.randomUUID();
+		given(currentUserService.getCurrentUser()).willReturn(user);
+
+		assertThat(mockMvc.post().uri("/api/meetings/{id}/summary/send-to-crm", meetingId))
+				.hasStatus(HttpStatus.NO_CONTENT);
+	}
+
+	@Test
+	void sendToCrmWithUnapprovedSummaryReturnsConflict() {
+		UUID meetingId = UUID.randomUUID();
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		willThrow(new SummaryNotApprovedException(meetingId))
+				.given(crmSyncService).sendApprovedSummaryToCrm(user, meetingId);
+
+		assertThat(mockMvc.post().uri("/api/meetings/{id}/summary/send-to-crm", meetingId))
+				.hasStatus(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void sendToCrmWithoutCrmConnectionReturnsBadRequest() {
+		UUID meetingId = UUID.randomUUID();
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		willThrow(new CrmConnectionException("Nenhuma conexão de CRM configurada."))
+				.given(crmSyncService).sendApprovedSummaryToCrm(user, meetingId);
+
+		assertThat(mockMvc.post().uri("/api/meetings/{id}/summary/send-to-crm", meetingId))
+				.hasStatus(HttpStatus.BAD_REQUEST);
 	}
 
 }
