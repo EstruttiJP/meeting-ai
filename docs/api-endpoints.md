@@ -1,71 +1,78 @@
 # API endpoints — Meeting AI
 
 Referência dos endpoints REST do backend, derivada do modelo de dados e do
-fluxo de produto descritos em [`PLAIN.md`](../PLAIN.md). Esta é a fundação
-de código (entidades, DTOs, controllers) — a maioria dos métodos abaixo
-ainda não tem lógica de negócio implementada (ver coluna "Status").
+fluxo de produto descritos em [`PLAIN.md`](../PLAIN.md). Todos os métodos
+abaixo têm lógica de negócio implementada — a coluna "Observações" registra
+comportamento não óbvio a partir da assinatura (regra de autorização,
+efeito colateral, pré-condição).
 
-Todas as rotas sob `/api/**` exigem autenticação (ver
-[`SecurityConfig`](../backend/src/main/java/com/meetingai/backend/security/SecurityConfig.java)).
-`/actuator/health` e `/oauth2/**` ficam liberados.
+Todas as rotas sob `/api/**` exigem sessão autenticada via Google OAuth2
+(ver [`SecurityConfig`](../backend/src/main/java/com/meetingai/backend/security/SecurityConfig.java)) —
+sem sessão, devolvem `401`. `/actuator/health`, `/oauth2/**` e `/login/**`
+ficam liberados. `@Valid` roda antes de qualquer lógica: requisição inválida
+sempre retorna `400`, nunca chega ao controller.
 
 ## Users
 
-| Método | Rota            | Descrição                          | Status |
-|--------|-----------------|-------------------------------------|--------|
-| GET    | `/api/users/me` | Perfil do usuário autenticado        | 501 — depende do login OAuth2 (ainda não implementado) |
+| Método | Rota            | Descrição                          |
+|--------|-----------------|-------------------------------------|
+| GET    | `/api/users/me` | Perfil do usuário autenticado (upsert automático no primeiro login Google) |
 
 ## Usage quota
 
-| Método | Rota                    | Descrição                              | Status |
-|--------|-------------------------|------------------------------------------|--------|
-| GET    | `/api/usage-quota/me`   | Cota de uso do mês corrente do usuário    | 501 — depende de resolução do usuário autenticado |
+| Método | Rota                    | Descrição                              |
+|--------|-------------------------|------------------------------------------|
+| GET    | `/api/usage-quota/me`   | Cota de uso do mês corrente — cria a cota com o limite padrão se ainda não existir |
 
 ## AI provider config
 
-| Método | Rota                              | Descrição                                          | Status |
-|--------|------------------------------------|-------------------------------------------------------|--------|
-| GET    | `/api/ai-provider-configs`         | Lista as configurações de provider de IA do usuário    | 501 |
-| POST   | `/api/ai-provider-configs`         | Cria/atualiza uma configuração (provider + chave própria opcional) | 501 — requer criptografia da chave |
-| DELETE | `/api/ai-provider-configs/{id}`    | Remove uma configuração                                 | 501 |
+| Método | Rota                              | Descrição                                          | Observações |
+|--------|------------------------------------|-------------------------------------------------------|-------------|
+| GET    | `/api/ai-provider-configs`         | Lista as configurações de provider de IA do usuário    | Chave nunca aparece na resposta — só `hasApiKey: boolean` |
+| POST   | `/api/ai-provider-configs`         | Cria/atualiza a configuração de um provider (chave própria opcional) | Criptografa a chave antes de salvar; marcar `isDefault: true` desmarca o default anterior; upsert por (usuário, provider) |
+| DELETE | `/api/ai-provider-configs/{id}`    | Remove uma configuração                                 | `404` (não `403`) se a config não for do usuário autenticado |
 
 ## CRM connection
 
-| Método | Rota                        | Descrição                                  | Status |
-|--------|------------------------------|-----------------------------------------------|--------|
-| GET    | `/api/crm-connections/me`    | Status da conexão com o CRM (Pipedrive)         | 501 |
-| POST   | `/api/crm-connections`       | Salva a conexão após o OAuth do Pipedrive          | 501 — requer troca de código OAuth |
-| DELETE | `/api/crm-connections/me`    | Desconecta o CRM                                    | 501 |
+| Método | Rota                        | Descrição                                  | Observações |
+|--------|------------------------------|-----------------------------------------------|-------------|
+| GET    | `/api/crm-connections/me`    | Status da conexão com o CRM (Pipedrive)         | `404` se não houver conexão |
+| POST   | `/api/crm-connections`       | Troca o código OAuth do Pipedrive por tokens e salva a conexão | Tokens criptografados; substitui conexão anterior do usuário |
+| DELETE | `/api/crm-connections/me`    | Desconecta o CRM                                    | |
 
 ## Meetings
 
-| Método | Rota                    | Descrição                                        | Status |
-|--------|--------------------------|-----------------------------------------------------|--------|
-| GET    | `/api/meetings`          | Lista as reuniões do usuário (dashboard)              | 501 — depende de resolução do usuário autenticado |
-| POST   | `/api/meetings`          | Upload de arquivo de reunião (multipart: `title`, `file`) | 501 — requer storage + pipeline assíncrono |
-| GET    | `/api/meetings/{id}`     | Detalhe/status de uma reunião                          | 501 |
+| Método | Rota                    | Descrição                                        | Observações |
+|--------|--------------------------|-----------------------------------------------------|-------------|
+| GET    | `/api/meetings`          | Lista as reuniões do usuário (dashboard)              | Sem paginação ainda |
+| POST   | `/api/meetings`          | Upload de arquivo de reunião (multipart: `title`, `file`) | Valida formato (mp3/mp4/wav/m4a) e tamanho antes de checar `UsageQuota`; dispara o pipeline assíncrono (transcrição → resumo) e responde `201` sem esperar terminar |
+| GET    | `/api/meetings/{id}`     | Detalhe/status de uma reunião                          | `404` se não for do usuário autenticado |
 
 ## Transcription
 
-| Método | Rota                                  | Descrição                  | Status |
-|--------|----------------------------------------|--------------------------------|--------|
-| GET    | `/api/meetings/{id}/transcription`     | Conteúdo da transcrição gerada    | 501 |
+| Método | Rota                                  | Descrição                  | Observações |
+|--------|----------------------------------------|--------------------------------|-------------|
+| GET    | `/api/meetings/{id}/transcription`     | Conteúdo da transcrição gerada    | `404` se o pipeline ainda não chegou lá |
 
 ## Summary
 
-| Método | Rota                                        | Descrição                                          | Status |
-|--------|-----------------------------------------------|---------------------------------------------------------|--------|
-| GET    | `/api/meetings/{id}/summary`                  | Resumo estruturado gerado pelo LLM                        | 501 |
-| PUT    | `/api/meetings/{id}/summary`                  | Edição do resumo pelo usuário antes do envio ao CRM          | 501 |
-| POST   | `/api/meetings/{id}/summary/send-to-crm`      | Envia o resumo aprovado para o CRM                            | 501 — requer integração Pipedrive |
+| Método | Rota                                        | Descrição                                          | Observações |
+|--------|-----------------------------------------------|---------------------------------------------------------|-------------|
+| GET    | `/api/meetings/{id}/summary`                  | Resumo estruturado gerado pelo LLM                        | `404` se o resumo ainda não existe |
+| PUT    | `/api/meetings/{id}/summary`                  | Edição do resumo pelo usuário — é a própria revisão humana, aprova ao salvar | Não existe endpoint de "aprovar" separado; PUT edita e aprova numa tacada só |
+| POST   | `/api/meetings/{id}/summary/send-to-crm`      | Envia o resumo aprovado para o CRM (cria negócio + nota no Pipedrive) | `409` se o resumo não estiver aprovado; `400` se não houver CRM conectado; nunca dispara sozinho, só a partir desta chamada explícita |
 
-## Sobre o status 501
+## Pipeline assíncrono
 
-Nesta etapa da fundação de código não existe login OAuth2 funcional (login
-Google ainda não foi implementado), então **nenhum endpoint consegue
-resolver "usuário autenticado"** de forma real — por isso todos os métodos
-retornam `501 Not Implemented` em vez de dado mockado: um mock exigiria
-inventar a forma da resposta antes de a lógica real (auth, storage,
-criptografia, chamadas a LLM/CRM) existir, o que arriscaria divergir do
-formato real depois. A validação de entrada (`@Valid`) roda normalmente
-antes do stub (requisição inválida retorna `400`, nunca chega a `501`).
+Upload dispara `MeetingPipelineService` em background
+(`UPLOADED → TRANSCRIBING → SUMMARIZING → READY`). Qualquer falha em
+qualquer etapa (Whisper fora do ar, resposta do LLM fora do schema
+esperado, etc.) marca a reunião como `FAILED` em vez de deixar status
+inconsistente ou dado malformado salvo. O provider de resumo usado depende
+da configuração padrão do usuário em `/api/ai-provider-configs` — sem
+configuração própria, cai no OpenRouter (plano free da aplicação).
+
+Um job agendado (`MeetingExpirationJob`, de hora em hora) apaga o arquivo
+de áudio e marca `EXPIRED` para reuniões com `expires_at` vencido
+(7 dias por padrão, configurável via `MEETING_RETENTION_DAYS`) — o resumo
+em texto permanece no banco.

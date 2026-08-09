@@ -1,9 +1,12 @@
 # Meeting AI
 
 SaaS que transcreve reuniões (áudio/vídeo) e atualiza o CRM automaticamente
-a partir do resumo gerado, sempre com revisão humana antes do envio. Este
-repositório está na fase de fundação: ainda não há lógica de negócio, só o
-esqueleto do monorepo e o ambiente de desenvolvimento local.
+a partir do resumo gerado, sempre com revisão humana antes do envio. O
+pipeline principal (login com Google, upload, transcrição via Whisper,
+resumo estruturado via LLM, revisão, envio ao Pipedrive, expiração
+automática do áudio) já roda de ponta a ponta contra o ambiente local —
+ver [`docs/api-endpoints.md`](docs/api-endpoints.md) para o contrato de
+API completo.
 
 O plano de produto completo (etapas futuras: transcrição, resumo via LLM,
 integração com CRM, deploy em AWS) está em [`PLAIN.md`](PLAIN.md). As
@@ -19,17 +22,29 @@ flowchart LR
         BE["backend<br/>Spring Boot<br/>:8080"]
         PG[("postgres<br/>:5432")]
         LS["localstack<br/>S3 + SQS<br/>:4566"]
+        WH["whisper<br/>faster-whisper<br/>:9000"]
     end
+
+    OR(["OpenRouter / OpenAI /<br/>Gemini / Claude"])
+    PD(["Pipedrive"])
 
     Browser(["navegador"]) --> FE
     FE -- "GET /api/health" --> BE
     BE --> PG
-    BE -. "futuro: upload/transcrição" .-> LS
+    BE -- "transcrição" --> WH
+    BE -. "resumo estruturado" .-> OR
+    BE -. "OAuth + criação de negócio" .-> PD
+    BE -. "reservado p/ Etapa 4 (S3/SQS reais)" .-> LS
 ```
 
-Em produção (etapa futura), `postgres` vira RDS, `localstack` vira S3 + SQS
-reais, `backend` roda em ECS/Fargate e `frontend` é buildado e servido via
-S3 + CloudFront — ver Etapa 4 em [`PLAIN.md`](PLAIN.md).
+O áudio de upload fica em disco local (`StorageService`/`LocalDiskStorageService`),
+não no LocalStack — o bucket S3 já existe no ambiente local pra Etapa 4
+(deploy), mas a aplicação só passa a usá-lo trocando a implementação por
+configuração, sem mudar código (ver
+[`docs/decisions/`](docs/decisions/)). Em produção, `postgres` vira RDS,
+`localstack` vira S3 + SQS reais, `whisper` vira Amazon Transcribe,
+`backend` roda em ECS/Fargate e `frontend` é buildado e servido via S3 +
+CloudFront — ver Etapa 4 em [`PLAIN.md`](PLAIN.md).
 
 ## Como rodar localmente
 
@@ -37,21 +52,31 @@ Pré-requisitos: Docker e Docker Compose. Nada mais precisa estar instalado
 na máquina — Java, Maven, Node e Angular CLI já vêm dentro dos containers.
 
 ```bash
-cp .env.example .env   # valores padrão já funcionam para desenvolvimento
+cp .env.example .env   # valores padrão já sobem o ambiente
 docker compose up
 ```
 
-Isso sobe 4 serviços, sem nenhum passo manual adicional:
+Isso sobe 5 serviços, sem nenhum passo manual adicional:
 
 | Serviço    | URL local               | O que é                                   |
 |------------|--------------------------|--------------------------------------------|
 | `frontend` | http://localhost:4200    | Angular, com live reload                   |
 | `backend`  | http://localhost:8080    | Spring Boot, com restart automático (DevTools) |
 | `postgres` | localhost:5432            | banco de dados                             |
-| `localstack` | http://localhost:4566   | S3 + SQS locais, já com bucket e fila criados |
+| `localstack` | http://localhost:4566   | S3 + SQS locais, já com bucket e fila criados (reservado pra Etapa 4) |
+| `whisper`  | http://localhost:9000    | transcrição local (faster-whisper), sem custo de AWS |
 
 Abra http://localhost:4200 — a tela inicial mostra se o frontend conseguiu
 falar com o `GET /api/health` do backend.
+
+Os defaults do `.env.example` sobem o ambiente e deixam todo o pipeline
+compilando/testável, mas algumas features só funcionam de verdade com
+credenciais reais (documentadas, sem valor, no próprio `.env.example`):
+login exige `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` de um app OAuth do
+Google Cloud Console; resumo via LLM (plano free) exige
+`OPENROUTER_API_KEY`; envio ao CRM exige `PIPEDRIVE_CLIENT_ID`/`PIPEDRIVE_CLIENT_SECRET`
+de um app Pipedrive. Sem isso, o backend sobe normalmente — só a chamada
+externa específica falha com uma mensagem clara.
 
 ### Hot-reload
 
