@@ -115,26 +115,3 @@ correspondente muda (`paths:` no workflow):
 Os dois já estão estruturados para que um job de `deploy` futuro entre com
 `needs: test` — ou seja, deploy nunca dispara sem os testes passarem antes
 (ver comentários nos próprios arquivos de workflow).
-
-### Branch protection (passo manual no GitHub — não é código)
-
-Como não há revisão humana de PR neste projeto, a esteira de CI precisa ser
-a única linha de defesa contra merge de código quebrado. Isso depende de
-uma configuração do repositório no GitHub, feita uma única vez pela
-interface (ou `gh api`), e não pode ser expressa em arquivo de workflow:
-
-1. No GitHub, vá em **Settings → Branches → Branch protection rules** e
-   crie uma regra para `main`.
-2. Marque **Require status checks to pass before merging**.
-3. Selecione os checks `CI Backend / test` e `CI Frontend / test` (eles só
-   aparecem na lista depois que os workflows rodarem pelo menos uma vez em
-   um PR).
-4. Marque **Require branches to be up to date before merging**, para evitar
-   merge de um branch desatualizado que passou em CI antes de um bug entrar
-   na `main`.
-5. (Recomendado, mesmo sem revisores) deixe **Do not allow bypassing the
-   above settings** marcado, para que nem o dono do repositório contorne a
-   checagem por acidente.
-
-Sem esse passo, o GitHub permite merge mesmo com o CI vermelho — os
-workflows por si só só reportam status, não bloqueiam nada.
