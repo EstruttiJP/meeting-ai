@@ -11,4 +11,6 @@ public interface TranscriptionProvider {
 
 	TranscriptionResult transcribe(InputStream audioContent, String filename, String contentType);
 
+	String providerName();
+
 }

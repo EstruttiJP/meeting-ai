@@ -70,6 +70,22 @@ public class Meeting {
 		}
 	}
 
+	public void markTranscribing() {
+		this.status = MeetingStatus.TRANSCRIBING;
+	}
+
+	public void markSummarizing() {
+		this.status = MeetingStatus.SUMMARIZING;
+	}
+
+	public void markReady() {
+		this.status = MeetingStatus.READY;
+	}
+
+	public void markFailed() {
+		this.status = MeetingStatus.FAILED;
+	}
+
 	public UUID getId() {
 		return id;
 	}

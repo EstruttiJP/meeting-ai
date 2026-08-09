@@ -29,6 +29,11 @@ class WhisperTranscriptionProviderTest {
 	}
 
 	@Test
+	void reportsWhisperLocalAsProviderName() {
+		assertThat(provider.providerName()).isEqualTo("whisper-local");
+	}
+
+	@Test
 	void transcribesAudioAndParsesWhisperResponse() {
 		mockServer.expect(requestTo(containsString("/asr")))
 				.andExpect(method(HttpMethod.POST))

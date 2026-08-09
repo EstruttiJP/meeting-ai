@@ -23,10 +23,13 @@ public class MeetingController {
 
 	private final CurrentUserService currentUserService;
 	private final MeetingUploadService meetingUploadService;
+	private final MeetingPipelineService meetingPipelineService;
 
-	public MeetingController(CurrentUserService currentUserService, MeetingUploadService meetingUploadService) {
+	public MeetingController(CurrentUserService currentUserService, MeetingUploadService meetingUploadService,
+			MeetingPipelineService meetingPipelineService) {
 		this.currentUserService = currentUserService;
 		this.meetingUploadService = meetingUploadService;
+		this.meetingPipelineService = meetingPipelineService;
 	}
 
 	@GetMapping
@@ -39,6 +42,8 @@ public class MeetingController {
 	public ResponseEntity<MeetingResponse> upload(@Valid @ModelAttribute MeetingUploadRequest request) {
 		User user = currentUserService.getCurrentUser();
 		Meeting meeting = meetingUploadService.upload(user, request.getTitle(), request.getFile());
+		// Dispara o pipeline em segundo plano — a resposta não espera transcrição/resumo terminar.
+		meetingPipelineService.process(meeting.getId());
 		return ResponseEntity.status(HttpStatus.CREATED).body(MeetingResponse.from(meeting));
 	}
 

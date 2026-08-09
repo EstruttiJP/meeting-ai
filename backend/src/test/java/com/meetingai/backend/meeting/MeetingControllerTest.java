@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
 // OAuth2ClientWebSecurityAutoConfiguration precisa de um bean HttpSecurity que só existe no
@@ -39,6 +40,9 @@ class MeetingControllerTest {
 
 	@MockitoBean
 	private MeetingUploadService meetingUploadService;
+
+	@MockitoBean
+	private MeetingPipelineService meetingPipelineService;
 
 	private final User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 
@@ -65,6 +69,7 @@ class MeetingControllerTest {
 				.bodyJson()
 				.extractingPath("$.status")
 				.isEqualTo("UPLOADED");
+		verify(meetingPipelineService).process(meeting.getId());
 	}
 
 	@Test

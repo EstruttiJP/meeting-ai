@@ -52,6 +52,11 @@ public class WhisperTranscriptionProvider implements TranscriptionProvider {
 		return new TranscriptionResult(response.text().trim(), response.language());
 	}
 
+	@Override
+	public String providerName() {
+		return PROVIDER_NAME;
+	}
+
 	private record WhisperResponse(String text, String language) {
 	}
 
