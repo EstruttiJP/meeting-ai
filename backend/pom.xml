@@ -39,6 +39,12 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 		<dependency>
+			<!-- RestClient referencia Publisher ao montar corpo multipart (upload de áudio
+			     para o Whisper), mesmo em uso 100% síncrono/bloqueante. -->
+			<groupId>org.reactivestreams</groupId>
+			<artifactId>reactive-streams</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
