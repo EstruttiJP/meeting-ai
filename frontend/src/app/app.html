@@ -1,0 +1,25 @@
+<main class="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-950 p-6 text-slate-100">
+  <h1 class="text-4xl font-semibold tracking-tight">{{ title() }}</h1>
+  <p class="text-slate-400">Transcreva reuniões e atualize seu CRM automaticamente.</p>
+
+  <div
+    class="flex items-center gap-3 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm"
+  >
+    @switch (backendStatus()) {
+      @case ('checking') {
+        <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-400"></span>
+        <span>Verificando conexão com o backend...</span>
+      }
+      @case ('up') {
+        <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+        <span>Backend online ({{ backendService() }})</span>
+      }
+      @case ('down') {
+        <span class="h-2.5 w-2.5 rounded-full bg-red-500"></span>
+        <span>Backend indisponível</span>
+      }
+    }
+  </div>
+
+  <router-outlet />
+</main>
