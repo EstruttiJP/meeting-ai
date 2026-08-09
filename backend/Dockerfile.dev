@@ -1,0 +1,19 @@
+FROM maven:3.9-eclipse-temurin-25
+
+# entr recompiles on save so Spring Boot DevTools has something to restart
+# on (see dev-entrypoint.sh for why this is needed).
+RUN apt-get update && apt-get install -y --no-install-recommends entr \
+	&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Cache dependencies in their own layer so `docker compose build` stays fast
+# even though the real source is bind-mounted over this at runtime.
+COPY pom.xml .
+RUN mvn -B dependency:go-offline
+
+COPY . .
+
+EXPOSE 8080
+
+CMD ["./dev-entrypoint.sh"]
