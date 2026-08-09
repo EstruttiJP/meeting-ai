@@ -64,9 +64,14 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       WHISPER_BASE_URL: http://whisper:9000
+      # Sem valor aqui de propósito: se não vierem do .env, o Compose omite a
+      # variável em vez de passar string vazia — application.properties tem
+      # defaults de dev sensatos só para o caso de "totalmente ausente".
+      GOOGLE_CLIENT_ID:
+      GOOGLE_CLIENT_SECRET:
+      APP_ENCRYPTION_KEY:
+      APP_ENCRYPTION_SALT:
     volumes:
       - ./backend:/app
       - backend-m2:/root/.m2
