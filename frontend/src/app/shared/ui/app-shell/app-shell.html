@@ -1,0 +1,41 @@
+<div class="min-h-screen bg-slate-50 dark:bg-slate-950">
+  <header class="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-6 px-6 py-3">
+      <div class="flex items-center gap-8">
+        <span class="text-lg font-semibold text-slate-900 dark:text-slate-100">Meeting AI</span>
+        <nav class="flex items-center gap-1">
+          <a
+            routerLink="/dashboard"
+            routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+            class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >Reuniões</a
+          >
+          <a
+            routerLink="/upload"
+            routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+            class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >Nova reunião</a
+          >
+          <a
+            routerLink="/settings"
+            routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+            class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >Configurações</a
+          >
+        </nav>
+      </div>
+
+      @if (currentUser(); as user) {
+        <div class="flex items-center gap-3">
+          <p-avatar [image]="user.pictureUrl ?? undefined" [label]="user.pictureUrl ? undefined : user.name.charAt(0)" shape="circle" />
+          <span class="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">{{ user.name }}</span>
+          <p-button label="Sair" severity="secondary" text="true" size="small" (onClick)="logout()" />
+        </div>
+      }
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-6 py-8">
+    <router-outlet />
+  </main>
+</div>
