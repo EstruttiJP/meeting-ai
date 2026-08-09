@@ -70,6 +70,35 @@ public class Meeting {
 		}
 	}
 
+	public void markTranscribing() {
+		this.status = MeetingStatus.TRANSCRIBING;
+	}
+
+	public void markSummarizing() {
+		this.status = MeetingStatus.SUMMARIZING;
+	}
+
+	public void markReady() {
+		this.status = MeetingStatus.READY;
+	}
+
+	public void markFailed() {
+		this.status = MeetingStatus.FAILED;
+	}
+
+	public void markSentToCrm() {
+		this.status = MeetingStatus.SENT_TO_CRM;
+		this.sentToCrmAt = Instant.now();
+	}
+
+	public void markExpired() {
+		this.status = MeetingStatus.EXPIRED;
+	}
+
+	public void scheduleExpiration(Instant expiresAt) {
+		this.expiresAt = expiresAt;
+	}
+
 	public UUID getId() {
 		return id;
 	}

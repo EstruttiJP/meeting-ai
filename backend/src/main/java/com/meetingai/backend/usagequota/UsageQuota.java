@@ -68,6 +68,14 @@ public class UsageQuota {
 		updatedAt = Instant.now();
 	}
 
+	public boolean hasCapacity() {
+		return meetingsUploaded < meetingsLimit;
+	}
+
+	public void incrementUsage() {
+		this.meetingsUploaded++;
+	}
+
 	public UUID getId() {
 		return id;
 	}

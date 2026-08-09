@@ -71,6 +71,15 @@ public class Summary {
 		updatedAt = Instant.now();
 	}
 
+	public void updateContent(String content) {
+		this.content = content;
+	}
+
+	public void approve() {
+		this.approved = true;
+		this.approvedAt = Instant.now();
+	}
+
 	public UUID getId() {
 		return id;
 	}

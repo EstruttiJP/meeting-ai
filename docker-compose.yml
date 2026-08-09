@@ -34,6 +34,14 @@ services:
       timeout: 5s
       retries: 20
 
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    environment:
+      ASR_MODEL: ${WHISPER_MODEL:-base}
+      ASR_ENGINE: faster_whisper
+    ports:
+      - "9000:9000"
+
   backend:
     build:
       context: ./backend
@@ -45,6 +53,8 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      whisper:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-meetingai}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
@@ -53,6 +63,19 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
       AWS_REGION: ${AWS_REGION:-us-east-1}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+      WHISPER_BASE_URL: http://whisper:9000
+      # Sem valor aqui de propósito: se não vierem do .env, o Compose omite a
+      # variável em vez de passar string vazia — application.properties tem
+      # defaults de dev sensatos só para o caso de "totalmente ausente".
+      GOOGLE_CLIENT_ID:
+      GOOGLE_CLIENT_SECRET:
+      APP_ENCRYPTION_KEY:
+      APP_ENCRYPTION_SALT:
+      OPENROUTER_API_KEY:
+      PIPEDRIVE_CLIENT_ID:
+      PIPEDRIVE_CLIENT_SECRET:
+      PIPEDRIVE_REDIRECT_URI:
     volumes:
       - ./backend:/app
       - backend-m2:/root/.m2

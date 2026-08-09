@@ -39,12 +39,29 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 		<dependency>
+			<!-- RestClient referencia Publisher ao montar corpo multipart (upload de áudio
+			     para o Whisper), mesmo em uso 100% síncrono/bloqueante. -->
+			<groupId>org.reactivestreams</groupId>
+			<artifactId>reactive-streams</artifactId>
+		</dependency>
+		<dependency>
+			<!-- Spring Boot 4 usa Jackson 3 (groupId tools.jackson.core) — mesma versão
+			     que o Boot autoconfigura como bean ObjectMapper, mas em compile scope
+			     explícito porque só vem transitivo (via flyway) hoje. -->
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
