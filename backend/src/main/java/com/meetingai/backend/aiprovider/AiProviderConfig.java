@@ -91,6 +91,10 @@ public class AiProviderConfig {
 		return isDefault;
 	}
 
+	public void clearDefault() {
+		this.isDefault = false;
+	}
+
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
