@@ -84,12 +84,6 @@ docker compose exec localstack awslocal s3 ls
 docker compose exec localstack awslocal sqs list-queues
 ```
 
-### Variáveis de ambiente
-
-Nenhum segredo é commitado no repositório. [`.env.example`](.env.example)
-documenta todas as variáveis usadas pelo `docker-compose.yml`; copie para
-`.env` (já ignorado pelo Git) e ajuste se necessário.
-
 ## Estrutura de pastas
 
 ```
