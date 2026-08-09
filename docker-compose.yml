@@ -73,6 +73,9 @@ services:
       APP_ENCRYPTION_KEY:
       APP_ENCRYPTION_SALT:
       OPENROUTER_API_KEY:
+      PIPEDRIVE_CLIENT_ID:
+      PIPEDRIVE_CLIENT_SECRET:
+      PIPEDRIVE_REDIRECT_URI:
     volumes:
       - ./backend:/app
       - backend-m2:/root/.m2

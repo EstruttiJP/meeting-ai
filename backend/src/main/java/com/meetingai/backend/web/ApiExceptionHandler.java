@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.meetingai.backend.aiprovider.AiProviderConfigNotFoundException;
+import com.meetingai.backend.crm.CrmConnectionException;
 import com.meetingai.backend.meeting.MeetingFileTooLargeException;
 import com.meetingai.backend.meeting.MeetingNotFoundException;
 import com.meetingai.backend.meeting.UnsupportedMeetingFormatException;
@@ -53,6 +54,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(SummaryNotFoundException.class)
 	public ProblemDetail handleSummaryNotFound(SummaryNotFoundException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler(CrmConnectionException.class)
+	public ProblemDetail handleCrmConnectionFailure(CrmConnectionException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 	/**
