@@ -1,1 +1,100 @@
-<p>review está em construção.</p>
+<div class="mx-auto max-w-2xl">
+  @if (loading()) {
+    <app-loading-state message="Carregando resumo..." />
+  } @else if (errorMessage(); as message) {
+    <app-error-state [message]="message" (retry)="load()" />
+  } @else if (meeting(); as m) {
+    <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ m.title }}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Revise o resumo gerado pela IA antes de aprovar. Nada é enviado ao CRM sem essa revisão.
+    </p>
+
+    @if (alreadySentToCrm()) {
+      <div
+        class="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+      >
+        <i class="pi pi-check-circle"></i>
+        <span>Já enviado ao CRM{{ m.sentToCrmAt ? ' em ' + (m.sentToCrmAt | date: 'dd/MM/yyyy HH:mm') : '' }}.</span>
+      </div>
+    }
+
+    @if (draft(); as content) {
+      <div class="mt-6 flex flex-col gap-5">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200" for="summary-text">
+            Resumo
+          </label>
+          <textarea
+            id="summary-text"
+            rows="4"
+            [ngModel]="content.summary"
+            (ngModelChange)="updateDraft({ summary: $event })"
+            class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          ></textarea>
+        </div>
+
+        <app-editable-list
+          label="Decisões"
+          [items]="content.decisions ?? []"
+          (itemsChange)="updateDraft({ decisions: $event })"
+        />
+        <app-editable-list
+          label="Próximos passos"
+          [items]="content.nextSteps ?? []"
+          (itemsChange)="updateDraft({ nextSteps: $event })"
+        />
+        <app-editable-list
+          label="Valores mencionados"
+          [items]="content.mentionedValues ?? []"
+          (itemsChange)="updateDraft({ mentionedValues: $event })"
+        />
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200" for="payment-method">
+            Forma de pagamento
+          </label>
+          <input
+            id="payment-method"
+            type="text"
+            [ngModel]="content.paymentMethod"
+            (ngModelChange)="updateDraft({ paymentMethod: $event })"
+            class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+
+        <app-editable-list
+          label="Objeções"
+          [items]="content.objections ?? []"
+          (itemsChange)="updateDraft({ objections: $event })"
+        />
+      </div>
+
+      @if (approveError(); as message) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+      @if (sendError(); as message) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <p-button
+          [label]="approving() ? 'Salvando...' : (summary()?.approved ? 'Salvar alterações' : 'Aprovar e salvar')"
+          icon="pi pi-check"
+          [disabled]="!canApprove()"
+          [loading]="approving()"
+          (onClick)="approveAndSave()"
+        />
+        @if (summary()?.approved) {
+          <p-button
+            [label]="alreadySentToCrm() ? 'Enviado ao CRM' : (sendingToCrm() ? 'Enviando...' : 'Enviar ao CRM')"
+            icon="pi pi-send"
+            severity="success"
+            [disabled]="alreadySentToCrm() || sendingToCrm()"
+            [loading]="sendingToCrm()"
+            (onClick)="sendToCrm()"
+          />
+        }
+      </div>
+    }
+  }
+</div>
