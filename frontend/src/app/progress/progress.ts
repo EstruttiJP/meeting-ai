@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Button } from 'primeng/button';
 
 import { toAppError } from '../core/http/to-app-error';
-import { Meeting, MeetingStatus } from '../core/models/meeting.model';
+import { Meeting, MeetingFailureCategory, MeetingStatus } from '../core/models/meeting.model';
 import { MeetingsService } from '../core/services/meetings.service';
 import { ErrorState } from '../shared/ui/error-state/error-state';
 import { LoadingState } from '../shared/ui/loading-state/loading-state';
@@ -18,6 +18,18 @@ const PIPELINE_STEPS: { status: MeetingStatus; label: string }[] = [
 ];
 
 const TERMINAL_STATUSES: MeetingStatus[] = ['READY', 'SENT_TO_CRM', 'FAILED', 'EXPIRED'];
+
+// Linguagem amigável por etapa que falhou — o motivo técnico fica no backend
+// (meeting.failure_reason), não é exposto ao usuário.
+const FAILURE_MESSAGE: Record<MeetingFailureCategory, string> = {
+  TRANSCRIPTION:
+    'Não conseguimos transcrever o áudio desta reunião. Verifique se o arquivo não está corrompido e tente enviar novamente.',
+  SUMMARY:
+    'A transcrição ficou pronta, mas o serviço de IA não respondeu na hora de gerar o resumo. Tente novamente em alguns minutos.',
+  INVALID_SUMMARY_FORMAT:
+    'A transcrição ficou pronta, mas o resumo veio em um formato inesperado. Tentar de novo costuma resolver.',
+  UNKNOWN: 'Não conseguimos processar esta reunião. Tente enviar o arquivo novamente.',
+};
 
 @Component({
   selector: 'app-progress',
@@ -43,6 +55,14 @@ export class Progress implements OnInit {
       return -1;
     }
     return PIPELINE_STEPS.findIndex((step) => step.status === meeting.status);
+  });
+
+  protected readonly failureMessage = computed(() => {
+    const meeting = this.meeting();
+    if (!meeting || meeting.status !== 'FAILED') {
+      return null;
+    }
+    return FAILURE_MESSAGE[meeting.failureCategory ?? 'UNKNOWN'] ?? FAILURE_MESSAGE.UNKNOWN;
   });
 
   private pollHandle: ReturnType<typeof setInterval> | undefined;

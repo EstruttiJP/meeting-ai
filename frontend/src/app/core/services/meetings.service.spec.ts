@@ -29,6 +29,7 @@ describe('MeetingsService', () => {
         uploadedAt: new Date().toISOString(),
         expiresAt: null,
         sentToCrmAt: null,
+        failureCategory: null,
       },
     ];
 
@@ -52,6 +53,7 @@ describe('MeetingsService', () => {
       uploadedAt: new Date().toISOString(),
       expiresAt: null,
       sentToCrmAt: null,
+      failureCategory: null,
     };
 
     let result: Meeting | undefined;
@@ -77,6 +79,7 @@ describe('MeetingsService', () => {
       uploadedAt: new Date().toISOString(),
       expiresAt: null,
       sentToCrmAt: null,
+      failureCategory: null,
     };
 
     let result: Meeting | undefined;

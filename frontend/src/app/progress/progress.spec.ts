@@ -18,6 +18,7 @@ describe('Progress', () => {
     uploadedAt: new Date().toISOString(),
     expiresAt: null,
     sentToCrmAt: null,
+    failureCategory: null,
   });
 
   beforeEach(() => {
@@ -64,6 +65,36 @@ describe('Progress', () => {
 
     vi.advanceTimersByTime(10_000);
     expect(getSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a message specific to the pipeline step that failed', async () => {
+    const failed = (category: Meeting['failureCategory']): Meeting => ({
+      ...meetingWithStatus('FAILED'),
+      failureCategory: category,
+    });
+
+    for (const [category, expected] of [
+      ['TRANSCRIPTION', 'transcrever o áudio'],
+      ['SUMMARY', 'não respondeu'],
+      ['INVALID_SUMMARY_FORMAT', 'formato inesperado'],
+    ] as const) {
+      getSpy = vi.fn(() => of(failed(category))) as unknown as (id: string) => Observable<Meeting>;
+
+      await createFixture();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(expected);
+      TestBed.resetTestingModule();
+    }
+  });
+
+  it('falls back to the generic message when the backend sends no failure category', async () => {
+    getSpy = vi.fn(() => of(meetingWithStatus('FAILED'))) as unknown as (id: string) => Observable<Meeting>;
+
+    await createFixture();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Não conseguimos processar esta reunião');
   });
 
   it('stops polling and shows an error message when the request fails', async () => {

@@ -25,6 +25,7 @@ describe('Review', () => {
     uploadedAt: new Date().toISOString(),
     expiresAt: null,
     sentToCrmAt: null,
+    failureCategory: null,
   };
 
   const SUMMARY: Summary = {

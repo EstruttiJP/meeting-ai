@@ -20,6 +20,7 @@ describe('Dashboard', () => {
     uploadedAt: new Date().toISOString(),
     expiresAt: null,
     sentToCrmAt: null,
+    failureCategory: null,
   };
 
   beforeEach(async () => {

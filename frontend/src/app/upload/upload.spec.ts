@@ -36,6 +36,7 @@ describe('Upload', () => {
           uploadedAt: new Date().toISOString(),
           expiresAt: null,
           sentToCrmAt: null,
+          failureCategory: null,
         }),
     };
 
