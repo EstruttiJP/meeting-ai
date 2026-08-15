@@ -37,12 +37,18 @@
       } @else {
         <div class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
           <span class="text-sm text-slate-600 dark:text-slate-300">Nenhum CRM conectado.</span>
-          <p-button
-            label="Conectar Pipedrive"
-            icon="pi pi-link"
-            [loading]="crmConnecting()"
-            (onClick)="connectCrm()"
-          />
+          @if (pipedriveConfigured) {
+            <p-button
+              label="Conectar Pipedrive"
+              icon="pi pi-link"
+              [loading]="crmConnecting()"
+              (onClick)="connectCrm()"
+            />
+          } @else {
+            <span class="text-xs text-amber-600 dark:text-amber-400">
+              Pipedrive não configurado neste ambiente
+            </span>
+          }
         </div>
       }
     </div>

@@ -1,34 +1,26 @@
-import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, delay, of, throwError } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
 
+import { environment } from '../../../environments/environment';
 import { CrmConnection, CrmConnectionRequest } from '../models/crm-connection.model';
-import { MOCK_CRM_STATE } from '../testing/crm-connection.fixtures';
 
-// Mock temporário: lê/escreve o estado local em vez de chamar
-// GET/POST/DELETE /api/crm-connections.
 @Injectable({ providedIn: 'root' })
 export class CrmConnectionService {
+  private readonly http = inject(HttpClient);
+
+  // 404 quando não há conexão — o componente trata isso como "desconectado",
+  // não como erro (ver ApiExceptionHandler não intercepta esse 404 específico,
+  // é o comportamento normal do endpoint).
   me(): Observable<CrmConnection> {
-    if (!MOCK_CRM_STATE.connection) {
-      return throwError(() => new HttpErrorResponse({ status: 404 })).pipe(delay(300));
-    }
-    return of(MOCK_CRM_STATE.connection).pipe(delay(300));
+    return this.http.get<CrmConnection>(`${environment.apiBaseUrl}/api/crm-connections/me`);
   }
 
   connect(request: CrmConnectionRequest): Observable<CrmConnection> {
-    const connection: CrmConnection = {
-      id: 'crm-connection-1',
-      provider: request.provider,
-      connectedAt: new Date().toISOString(),
-      tokenExpiresAt: null,
-    };
-    MOCK_CRM_STATE.connection = connection;
-    return of(connection).pipe(delay(500));
+    return this.http.post<CrmConnection>(`${environment.apiBaseUrl}/api/crm-connections`, request);
   }
 
   disconnect(): Observable<void> {
-    MOCK_CRM_STATE.connection = null;
-    return of(undefined).pipe(delay(300));
+    return this.http.delete<void>(`${environment.apiBaseUrl}/api/crm-connections/me`);
   }
 }
