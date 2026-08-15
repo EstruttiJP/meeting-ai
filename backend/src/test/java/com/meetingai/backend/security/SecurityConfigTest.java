@@ -28,4 +28,14 @@ class SecurityConfigTest {
 				.hasStatusOk();
 	}
 
+	// Regressão: CookieCsrfTokenRepository só escreve o cookie XSRF-TOKEN se algo
+	// resolver o CsrfToken durante a requisição. Sem o CsrfCookieFilter forçando essa
+	// resolução, o cookie nunca aparecia e todo POST/PUT/DELETE do frontend (que
+	// depende dele pro header X-XSRF-TOKEN) caía num 403 antes de chegar no controller.
+	@Test
+	void csrfCookieIsSetOnFirstRequest() {
+		assertThat(mockMvc.get().uri("/api/users/me"))
+				.cookies().containsKey("XSRF-TOKEN");
+	}
+
 }
