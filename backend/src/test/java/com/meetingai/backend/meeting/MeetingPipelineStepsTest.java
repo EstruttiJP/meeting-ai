@@ -92,12 +92,14 @@ class MeetingPipelineStepsTest {
 	}
 
 	@Test
-	void markFailedUpdatesStatusWhenMeetingExists() {
+	void markFailedPersistsCategoryAndTechnicalReason() {
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
 
-		steps.markFailed(meetingId);
+		steps.markFailed(meetingId, MeetingFailureCategory.TRANSCRIPTION, "422 audio_file: Field required");
 
 		assertThat(meeting.getStatus()).isEqualTo(MeetingStatus.FAILED);
+		assertThat(meeting.getFailureCategory()).isEqualTo(MeetingFailureCategory.TRANSCRIPTION);
+		assertThat(meeting.getFailureReason()).isEqualTo("422 audio_file: Field required");
 		verify(meetingRepository).save(meeting);
 	}
 
@@ -105,7 +107,7 @@ class MeetingPipelineStepsTest {
 	void markFailedDoesNothingWhenMeetingIsMissing() {
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.empty());
 
-		steps.markFailed(meetingId);
+		steps.markFailed(meetingId, MeetingFailureCategory.UNKNOWN, "erro qualquer");
 
 		verify(meetingRepository, never()).save(any());
 	}

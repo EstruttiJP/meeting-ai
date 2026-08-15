@@ -1,6 +1,7 @@
 package com.meetingai.backend.summary;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -37,6 +38,8 @@ abstract class AbstractLlmSummaryProvider {
 			%s
 			""";
 
+	private static final int RAW_RESPONSE_LOG_LIMIT = 500;
+
 	private final ObjectMapper objectMapper;
 	private final Validator validator;
 
@@ -55,20 +58,37 @@ abstract class AbstractLlmSummaryProvider {
 		try {
 			content = objectMapper.readValue(json, SummaryContent.class);
 		} catch (JacksonException e) {
-			throw new SummaryGenerationException(
-					"Resposta do modelo não é um JSON válido no formato esperado", e);
+			throw new SummaryFormatException(
+					"Resposta do modelo não é um JSON válido no formato esperado. Resposta bruta: "
+							+ truncate(rawResponse), e);
 		}
 		Set<ConstraintViolation<SummaryContent>> violations = validator.validate(content);
 		if (!violations.isEmpty()) {
-			throw new SummaryGenerationException(
-					"Resposta do modelo não atende ao schema esperado: " + violations);
+			String campos = violations.stream()
+					.map(v -> v.getPropertyPath() + " " + v.getMessage())
+					.collect(Collectors.joining("; "));
+			throw new SummaryFormatException(
+					"Resposta do modelo não atende ao schema esperado (" + campos + "). Resposta bruta: "
+							+ truncate(rawResponse));
 		}
 		return content;
 	}
 
+	/**
+	 * Trunca porque a resposta bruta vai parar no log e em
+	 * {@code meeting.failure_reason} — o suficiente para diagnosticar o formato
+	 * sem despejar a transcrição inteira.
+	 */
+	private static String truncate(String rawResponse) {
+		String flat = rawResponse.strip().replaceAll("\\s+", " ");
+		return flat.length() <= RAW_RESPONSE_LOG_LIMIT
+				? flat
+				: flat.substring(0, RAW_RESPONSE_LOG_LIMIT) + "...(truncado)";
+	}
+
 	private String extractJson(String rawResponse) {
 		if (rawResponse == null || rawResponse.isBlank()) {
-			throw new SummaryGenerationException("Resposta vazia do modelo de IA");
+			throw new SummaryFormatException("Resposta vazia do modelo de IA");
 		}
 		String trimmed = rawResponse.trim();
 		if (trimmed.startsWith("```")) {

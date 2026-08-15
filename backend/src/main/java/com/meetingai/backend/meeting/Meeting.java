@@ -52,6 +52,13 @@ public class Meeting {
 	@Column(name = "sent_to_crm_at")
 	private Instant sentToCrmAt;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "failure_category", length = 30)
+	private MeetingFailureCategory failureCategory;
+
+	@Column(name = "failure_reason", columnDefinition = "text")
+	private String failureReason;
+
 	protected Meeting() {
 	}
 
@@ -82,8 +89,17 @@ public class Meeting {
 		this.status = MeetingStatus.READY;
 	}
 
-	public void markFailed() {
+	/**
+	 * O motivo técnico é obrigatório: uma reunião em FAILED sem causa registrada
+	 * é justamente o buraco de diagnóstico que essas colunas existem para fechar.
+	 */
+	public void markFailed(MeetingFailureCategory category, String reason) {
+		if (category == null || reason == null || reason.isBlank()) {
+			throw new IllegalArgumentException("Falha de reunião exige categoria e motivo técnico");
+		}
 		this.status = MeetingStatus.FAILED;
+		this.failureCategory = category;
+		this.failureReason = reason;
 	}
 
 	public void markSentToCrm() {
@@ -133,6 +149,14 @@ public class Meeting {
 
 	public Instant getSentToCrmAt() {
 		return sentToCrmAt;
+	}
+
+	public MeetingFailureCategory getFailureCategory() {
+		return failureCategory;
+	}
+
+	public String getFailureReason() {
+		return failureReason;
 	}
 
 }

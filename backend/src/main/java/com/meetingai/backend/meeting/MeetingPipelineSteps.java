@@ -68,9 +68,9 @@ class MeetingPipelineSteps {
 	}
 
 	@Transactional
-	void markFailed(UUID meetingId) {
+	void markFailed(UUID meetingId, MeetingFailureCategory category, String reason) {
 		meetingRepository.findById(meetingId).ifPresent(meeting -> {
-			meeting.markFailed();
+			meeting.markFailed(category, reason);
 			meetingRepository.save(meeting);
 		});
 	}

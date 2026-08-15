@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import com.meetingai.backend.meeting.MeetingPipelineSteps.PipelineContext;
 import com.meetingai.backend.storage.StorageService;
 import com.meetingai.backend.summary.SummaryContent;
+import com.meetingai.backend.summary.SummaryFormatException;
+import com.meetingai.backend.summary.SummaryGenerationException;
 import com.meetingai.backend.summary.SummaryOrchestrator;
 import com.meetingai.backend.transcription.TranscriptionException;
 import com.meetingai.backend.transcription.TranscriptionProvider;
@@ -31,6 +33,8 @@ import com.meetingai.backend.user.UserRepository;
 public class MeetingPipelineService {
 
 	private static final Logger log = LoggerFactory.getLogger(MeetingPipelineService.class);
+
+	private static final int REASON_MAX_LENGTH = 2000;
 
 	private static final Map<String, String> CONTENT_TYPES_BY_EXTENSION = Map.of(
 			"mp3", "audio/mpeg",
@@ -61,14 +65,18 @@ public class MeetingPipelineService {
 		try {
 			runPipeline(meetingId);
 		} catch (Exception e) {
-			log.error("Pipeline de transcrição/resumo falhou para a reunião {}", meetingId, e);
-			steps.markFailed(meetingId);
+			MeetingFailureCategory category = categorize(e);
+			String reason = describe(e);
+			log.error("Pipeline falhou para a reunião {} na etapa {}: {}", meetingId, category, reason, e);
+			steps.markFailed(meetingId, category, reason);
 		}
 	}
 
 	private void runPipeline(UUID meetingId) {
 		PipelineContext context = steps.markTranscribing(meetingId);
 
+		log.info("Transcrevendo reunião {} (arquivo {}) via provider {}",
+				meetingId, context.originalFilename(), transcriptionProvider.providerName());
 		TranscriptionResult transcriptionResult;
 		try (InputStream audio = storageService.retrieve(context.storageKey())) {
 			transcriptionResult = transcriptionProvider.transcribe(
@@ -77,11 +85,47 @@ public class MeetingPipelineService {
 			throw new TranscriptionException("Falha ao ler o arquivo de áudio para transcrição", e);
 		}
 		steps.saveTranscriptionAndMarkSummarizing(meetingId, transcriptionResult, transcriptionProvider.providerName());
+		log.info("Reunião {} transcrita: {} caracteres, idioma {}",
+				meetingId, transcriptionResult.content().length(), transcriptionResult.language());
 
 		User user = userRepository.findById(context.userId())
 				.orElseThrow(() -> new IllegalStateException("Usuário da reunião não encontrado: " + context.userId()));
 		SummaryContent summaryContent = summaryOrchestrator.summarize(user, transcriptionResult.content());
 		steps.saveSummaryAndMarkReady(meetingId, summaryContent);
+		log.info("Reunião {} resumida e marcada como READY", meetingId);
+	}
+
+	private static MeetingFailureCategory categorize(Exception e) {
+		if (e instanceof TranscriptionException) {
+			return MeetingFailureCategory.TRANSCRIPTION;
+		}
+		if (e instanceof SummaryFormatException) {
+			return MeetingFailureCategory.INVALID_SUMMARY_FORMAT;
+		}
+		if (e instanceof SummaryGenerationException) {
+			return MeetingFailureCategory.SUMMARY;
+		}
+		return MeetingFailureCategory.UNKNOWN;
+	}
+
+	/**
+	 * Mensagem técnica com a cadeia de causas — sem isso o motivo gravado vira
+	 * "Falha ao chamar a API de IA" sem dizer que por baixo houve um 402.
+	 */
+	private static String describe(Throwable e) {
+		StringBuilder text = new StringBuilder();
+		for (Throwable current = e; current != null && text.length() < REASON_MAX_LENGTH; current = current.getCause()) {
+			if (!text.isEmpty()) {
+				text.append(" | causa: ");
+			}
+			text.append(current.getClass().getSimpleName()).append(": ").append(current.getMessage());
+			if (current.getCause() == current) {
+				break;
+			}
+		}
+		return text.length() > REASON_MAX_LENGTH
+				? text.substring(0, REASON_MAX_LENGTH) + "...(truncado)"
+				: text.toString();
 	}
 
 	private String guessContentType(String filename) {
