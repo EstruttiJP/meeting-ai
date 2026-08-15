@@ -1,1 +1,151 @@
-<p>settings está em construção.</p>
+<div class="mx-auto flex max-w-2xl flex-col gap-10">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Configurações</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Conecte seu CRM e escolha qual provedor de IA gera os resumos das reuniões.
+    </p>
+  </div>
+
+  <section>
+    <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100">Integração com CRM</h2>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Necessário para enviar os resumos aprovados como negócios no Pipedrive.
+    </p>
+
+    <div class="mt-4">
+      @if (crmLoading()) {
+        <app-loading-state message="Verificando conexão com o CRM..." />
+      } @else if (crmError(); as message) {
+        <app-error-state [message]="message" (retry)="loadCrmConnection()" />
+      } @else if (crmConnection(); as connection) {
+        <div
+          class="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950"
+        >
+          <div class="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
+            <i class="pi pi-check-circle"></i>
+            <span>Pipedrive conectado desde {{ connection.connectedAt | date: 'dd/MM/yyyy' }}</span>
+          </div>
+          <p-button
+            label="Desconectar"
+            severity="danger"
+            text="true"
+            size="small"
+            [loading]="crmDisconnecting()"
+            (onClick)="disconnectCrm()"
+          />
+        </div>
+      } @else {
+        <div class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
+          <span class="text-sm text-slate-600 dark:text-slate-300">Nenhum CRM conectado.</span>
+          <p-button
+            label="Conectar Pipedrive"
+            icon="pi pi-link"
+            [loading]="crmConnecting()"
+            (onClick)="connectCrm()"
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100">Provedor de IA</h2>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Sem chave própria, o resumo usa o OpenRouter (plano free da aplicação). Uma chave salva nunca
+      volta a aparecer em texto puro — só indicamos que está configurada.
+    </p>
+
+    <div class="mt-4">
+      @if (configsLoading()) {
+        <app-loading-state message="Carregando provedores configurados..." />
+      } @else if (configsError(); as message) {
+        <app-error-state [message]="message" (retry)="loadProviderConfigs()" />
+      } @else {
+        @if (configs().length > 0) {
+          <ul class="mb-4 flex flex-col gap-2">
+            @for (config of configs(); track config.id) {
+              <li
+                class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-800"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="font-medium text-slate-800 dark:text-slate-100">{{
+                    providerLabels[config.provider]
+                  }}</span>
+                  @if (config.isDefault) {
+                    <span
+                      class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                      >Padrão</span
+                    >
+                  }
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ config.hasApiKey ? 'Chave própria configurada' : 'Sem chave própria' }}
+                  </span>
+                </div>
+                <p-button
+                  icon="pi pi-trash"
+                  severity="danger"
+                  text="true"
+                  size="small"
+                  [loading]="deletingId() === config.id"
+                  (onClick)="deleteProviderConfig(config.id)"
+                />
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+          <p class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-200">Adicionar ou atualizar provedor</p>
+
+          <div class="flex flex-col gap-3">
+            <div>
+              <label class="mb-1 block text-sm text-slate-600 dark:text-slate-300" for="provider-select">Provedor</label>
+              <p-select
+                inputId="provider-select"
+                [options]="providerOptions"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="selectedProvider"
+                styleClass="w-full"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-sm text-slate-600 dark:text-slate-300" for="api-key-input">
+                Chave de API própria (opcional)
+              </label>
+              <p-password
+                inputId="api-key-input"
+                [(ngModel)]="apiKeyDraft"
+                [feedback]="false"
+                [toggleMask]="true"
+                styleClass="w-full"
+                inputStyleClass="w-full"
+                placeholder="Deixe em branco para usar o plano free"
+              />
+            </div>
+
+            <div class="flex items-center gap-2">
+              <p-checkbox inputId="is-default-checkbox" [(ngModel)]="isDefaultDraft" [binary]="true" />
+              <label class="text-sm text-slate-600 dark:text-slate-300" for="is-default-checkbox">
+                Usar como provedor padrão
+              </label>
+            </div>
+
+            @if (saveError(); as message) {
+              <p class="text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+            }
+
+            <p-button
+              label="Salvar provedor"
+              icon="pi pi-save"
+              [disabled]="!canSave()"
+              [loading]="saving()"
+              (onClick)="saveProviderConfig()"
+            />
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+</div>

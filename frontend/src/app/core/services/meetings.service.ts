@@ -12,7 +12,9 @@ const PIPELINE_ORDER: MeetingStatus[] = ['UPLOADED', 'TRANSCRIBING', 'SUMMARIZIN
 @Injectable({ providedIn: 'root' })
 export class MeetingsService {
   list(): Observable<Meeting[]> {
-    return of(MOCK_MEETINGS).pipe(delay(400));
+    // Cópia rasa: upload()/get() mutam a fixture, e um array com a mesma
+    // referência não dispara um signal.set() se a tela chamar list() de novo.
+    return of([...MOCK_MEETINGS]).pipe(delay(400));
   }
 
   // A cada chamada avança a reunião um passo no pipeline (se ainda não terminou),
