@@ -67,4 +67,25 @@ describe('MeetingsService', () => {
 
     expect(result).toEqual(created);
   });
+
+  it('get() fetches GET /api/meetings/{id}', () => {
+    const meeting: Meeting = {
+      id: 'm3',
+      title: 'Reunião específica',
+      originalFilename: 'audio.mp3',
+      status: 'TRANSCRIBING',
+      uploadedAt: new Date().toISOString(),
+      expiresAt: null,
+      sentToCrmAt: null,
+    };
+
+    let result: Meeting | undefined;
+    service.get('m3').subscribe((response) => (result = response));
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m3');
+    expect(req.request.method).toBe('GET');
+    req.flush(meeting);
+
+    expect(result).toEqual(meeting);
+  });
 });
