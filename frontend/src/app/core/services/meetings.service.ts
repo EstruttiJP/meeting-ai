@@ -8,9 +8,9 @@ import { MOCK_MEETINGS } from '../testing/meeting.fixtures';
 
 const PIPELINE_ORDER: MeetingStatus[] = ['UPLOADED', 'TRANSCRIBING', 'SUMMARIZING', 'READY'];
 
-// get()/upload() ainda são mock temporário: geram fixtures locais em vez de
-// chamar a API real. O delay simula latência de rede pra loading state ser
-// visível na tela. list() já foi trocado por GET /api/meetings de verdade.
+// get() ainda é mock temporário: avança a fixture local em vez de chamar a
+// API real, pra tela de progresso ter algo pra mostrar entre uma sondagem e
+// outra. list() e upload() já chamam a API de verdade.
 @Injectable({ providedIn: 'root' })
 export class MeetingsService {
   private readonly http = inject(HttpClient);
@@ -39,16 +39,9 @@ export class MeetingsService {
   }
 
   upload(title: string, file: File): Observable<Meeting> {
-    const meeting: Meeting = {
-      id: crypto.randomUUID(),
-      title,
-      originalFilename: file.name,
-      status: 'UPLOADED',
-      uploadedAt: new Date().toISOString(),
-      expiresAt: null,
-      sentToCrmAt: null,
-    };
-    MOCK_MEETINGS.unshift(meeting);
-    return of(meeting).pipe(delay(600));
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('file', file);
+    return this.http.post<Meeting>(`${environment.apiBaseUrl}/api/meetings`, formData);
   }
 }

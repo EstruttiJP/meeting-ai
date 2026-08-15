@@ -1,13 +1,15 @@
-import { Injectable } from '@angular/core';
-import { Observable, delay, of } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
 
+import { environment } from '../../../environments/environment';
 import { UsageQuota } from '../models/usage-quota.model';
-import { MOCK_USAGE_QUOTA } from '../testing/usage-quota.fixtures';
 
-// Mock temporário: devolve a fixture local em vez de chamar GET /api/usage-quota/me.
 @Injectable({ providedIn: 'root' })
 export class UsageQuotaService {
+  private readonly http = inject(HttpClient);
+
   me(): Observable<UsageQuota> {
-    return of(MOCK_USAGE_QUOTA).pipe(delay(300));
+    return this.http.get<UsageQuota>(`${environment.apiBaseUrl}/api/usage-quota/me`);
   }
 }

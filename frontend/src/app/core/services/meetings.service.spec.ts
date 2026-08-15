@@ -41,4 +41,30 @@ describe('MeetingsService', () => {
 
     expect(result).toEqual(meetings);
   });
+
+  it('upload() posts a multipart request with title and file fields', () => {
+    const file = new File(['conteudo'], 'audio.mp3', { type: 'audio/mpeg' });
+    const created: Meeting = {
+      id: 'm2',
+      title: 'Nova reunião',
+      originalFilename: 'audio.mp3',
+      status: 'UPLOADED',
+      uploadedAt: new Date().toISOString(),
+      expiresAt: null,
+      sentToCrmAt: null,
+    };
+
+    let result: Meeting | undefined;
+    service.upload('Nova reunião', file).subscribe((response) => (result = response));
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBe(true);
+    const body = req.request.body as FormData;
+    expect(body.get('title')).toBe('Nova reunião');
+    expect(body.get('file')).toBe(file);
+    req.flush(created);
+
+    expect(result).toEqual(created);
+  });
 });
