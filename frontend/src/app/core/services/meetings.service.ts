@@ -1,20 +1,22 @@
-import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
 import { Observable, delay, of, throwError } from 'rxjs';
 
+import { environment } from '../../../environments/environment';
 import { Meeting, MeetingStatus } from '../models/meeting.model';
 import { MOCK_MEETINGS } from '../testing/meeting.fixtures';
 
 const PIPELINE_ORDER: MeetingStatus[] = ['UPLOADED', 'TRANSCRIBING', 'SUMMARIZING', 'READY'];
 
-// Mock temporário: devolve/gera fixtures locais em vez de chamar a API real
-// (GET/POST /api/meetings). O delay simula latência de rede pra loading state
-// ser visível na tela.
+// get()/upload() ainda são mock temporário: geram fixtures locais em vez de
+// chamar a API real. O delay simula latência de rede pra loading state ser
+// visível na tela. list() já foi trocado por GET /api/meetings de verdade.
 @Injectable({ providedIn: 'root' })
 export class MeetingsService {
+  private readonly http = inject(HttpClient);
+
   list(): Observable<Meeting[]> {
-    // Cópia rasa: upload()/get() mutam a fixture, e um array com a mesma
-    // referência não dispara um signal.set() se a tela chamar list() de novo.
-    return of([...MOCK_MEETINGS]).pipe(delay(400));
+    return this.http.get<Meeting[]>(`${environment.apiBaseUrl}/api/meetings`);
   }
 
   // A cada chamada avança a reunião um passo no pipeline (se ainda não terminou),
