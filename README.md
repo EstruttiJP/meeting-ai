@@ -91,6 +91,44 @@ variáveis do backend, esse valor não vem do `.env` — é preciso editar o
 arquivo diretamente e restartar o `ng serve`. Sem ele, o botão "Conectar
 Pipedrive" fica escondido em vez de levar pra um redirect quebrado.
 
+### Variáveis de ambiente
+
+A referência completa — o que cada variável faz, onde obter o valor e o que
+acontece sem ela — vive no [`.env.example`](.env.example), comentada linha a
+linha. O resumo:
+
+| Variável | Precisa? | Sem ela |
+|----------|----------|---------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | opcional | usa `postgres`/`postgres`/`meetingai` |
+| `LOCALSTACK_DEBUG`, `S3_BUCKET_NAME`, `SQS_QUEUE_NAME` | opcional | defaults do Compose |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` | opcional | `test`/`test`/`us-east-1` — o LocalStack não valida credencial |
+| `WHISPER_MODEL` | opcional | `base`; `small`+ transcreve melhor em português e mais devagar |
+| `FRONTEND_URL` | opcional | `http://localhost:4200` (origem do CORS e redirect pós-login) |
+| **`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`** | **sim** | não existe login — e toda rota `/api/**` exige sessão |
+| **`APP_ENCRYPTION_KEY` / `APP_ENCRYPTION_SALT`** | **sim** | cai num placeholder commitado (público) para criptografar chave de IA e token de CRM |
+| **`OPENROUTER_API_KEY`** | **sim** | transcrição funciona, resumo falha e a reunião termina em `FAILED` |
+| `OPENROUTER_MODEL` / `OPENROUTER_BASE_URL` | opcional | `openai/gpt-oss-20b:free` |
+| `GEMINI_MODEL` / `OPENAI_MODEL` / `CLAUDE_MODEL` | opcional | só afeta quem configurou chave própria |
+| `PIPEDRIVE_CLIENT_ID` / `PIPEDRIVE_CLIENT_SECRET` / `PIPEDRIVE_REDIRECT_URI` | opcional | tudo funciona, menos o envio ao CRM |
+| `MEETING_RETENTION_DAYS` / `MEETING_MAX_FILE_SIZE_MB` / `MEETING_EXPIRATION_CRON` | opcional | `7` dias / `200` MB / de hora em hora |
+| `USAGE_QUOTA_DEFAULT_MONTHLY_LIMIT` | opcional | `10` uploads por usuário/mês |
+
+Dois detalhes que custam tempo quando passam despercebidos:
+
+- **Deixar em branco não é o mesmo que omitir.** `MEETING_RETENTION_DAYS=`
+  entrega string vazia ao container, e o default do Spring não entra — no caso
+  de variável numérica, o backend nem sobe. Para usar o default, comente a linha
+  (é assim que as opcionais vêm no `.env.example`).
+- **Variável nova precisa ser repassada no `docker-compose.yml`**, no bloco
+  `environment:` do serviço `backend`. O `application.properties` até lê, mas o
+  container só enxerga o que o Compose entrega.
+
+Sobre `APP_ENCRYPTION_KEY`/`APP_ENCRYPTION_SALT`: trocar esses valores torna
+ilegível tudo que já foi criptografado com os anteriores — os usuários precisam
+colar a chave de IA de novo e reconectar o CRM. Gere um par por ambiente
+(`openssl rand -base64 32` e `openssl rand -hex 16`) e não rotacione sem
+planejar a migração.
+
 ### Hot-reload
 
 - **Backend**: o código-fonte de `backend/` é montado como volume dentro do
