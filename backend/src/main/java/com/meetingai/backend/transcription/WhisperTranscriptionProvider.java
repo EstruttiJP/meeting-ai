@@ -1,6 +1,7 @@
 package com.meetingai.backend.transcription;
 
 import java.io.InputStream;
+import java.util.List;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
@@ -70,7 +71,7 @@ public class WhisperTranscriptionProvider implements TranscriptionProvider {
 			throw new TranscriptionException(
 					"Transcrição vazia devolvida pelo Whisper: " + truncate(raw));
 		}
-		return new TranscriptionResult(response.text().trim(), response.language());
+		return new TranscriptionResult(response.text().trim(), response.language(), toSegments(response.segments()));
 	}
 
 	@Override
@@ -85,7 +86,24 @@ public class WhisperTranscriptionProvider implements TranscriptionProvider {
 				: flat.substring(0, RAW_RESPONSE_LOG_LIMIT) + "...(truncado)";
 	}
 
-	private record WhisperResponse(String text, String language) {
+	/**
+	 * Segmento sem texto é descartado: serve só como âncora de tempo para os
+	 * itens do resumo, e âncora sem conteúdo não ajuda o modelo nem o player.
+	 */
+	private static List<TranscriptionSegment> toSegments(List<WhisperSegment> segments) {
+		if (segments == null) {
+			return List.of();
+		}
+		return segments.stream()
+				.filter(s -> s.text() != null && !s.text().isBlank())
+				.map(s -> new TranscriptionSegment(s.start(), s.end(), s.text().trim()))
+				.toList();
+	}
+
+	private record WhisperSegment(double start, double end, String text) {
+	}
+
+	private record WhisperResponse(String text, String language, List<WhisperSegment> segments) {
 	}
 
 }

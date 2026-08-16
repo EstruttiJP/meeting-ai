@@ -43,7 +43,7 @@ class TranscriptionServiceTest {
 
 	@Test
 	void returnsTranscriptionWhenMeetingIsOwnedAndTranscriptionExists() {
-		Transcription transcription = new Transcription(meeting, "conteúdo", "pt", "whisper-local");
+		Transcription transcription = new Transcription(meeting, "conteúdo", "pt", "whisper-local", null);
 		given(meetingAccessService.getOwnedMeeting(user, meetingId)).willReturn(meeting);
 		given(transcriptionRepository.findByMeetingId(meetingId)).willReturn(Optional.of(transcription));
 

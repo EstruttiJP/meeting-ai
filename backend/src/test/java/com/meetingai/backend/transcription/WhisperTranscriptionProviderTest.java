@@ -96,6 +96,39 @@ class WhisperTranscriptionProviderTest {
 	}
 
 	@Test
+	void keepsWhisperSegmentsSoSummaryItemsCanBeAnchoredToTheAudio() {
+		mockServer.expect(requestTo(containsString("/asr")))
+				.andRespond(withSuccess("""
+						{"text": "Bom dia pessoal", "language": "pt", "segments": [
+						  {"start": 0.0, "end": 3.5, "text": " Bom dia"},
+						  {"start": 3.5, "end": 7.0, "text": " pessoal"}
+						]}
+						""", new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8)));
+
+		TranscriptionResult result = provider.transcribe(
+				new ByteArrayInputStream("audio".getBytes()), "reuniao.mp3", "audio/mpeg");
+
+		assertThat(result.segments()).containsExactly(
+				new TranscriptionSegment(0.0, 3.5, "Bom dia"),
+				new TranscriptionSegment(3.5, 7.0, "pessoal"));
+	}
+
+	@Test
+	void ignoresSegmentsWithoutTextAndToleratesResponsesWithoutSegments() {
+		mockServer.expect(requestTo(containsString("/asr")))
+				.andRespond(withSuccess("""
+						{"text": "Bom dia", "language": "pt", "segments": [
+						  {"start": 0.0, "end": 3.5, "text": "   "}
+						]}
+						""", new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8)));
+
+		TranscriptionResult result = provider.transcribe(
+				new ByteArrayInputStream("audio".getBytes()), "reuniao.mp3", "audio/mpeg");
+
+		assertThat(result.segments()).isEmpty();
+	}
+
+	@Test
 	void throwsTranscriptionExceptionWhenResponseHasNoText() {
 		mockServer.expect(requestTo(containsString("/asr")))
 				.andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));

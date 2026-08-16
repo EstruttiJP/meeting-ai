@@ -5,6 +5,9 @@ import java.util.UUID;
 
 import com.meetingai.backend.meeting.Meeting;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -37,17 +40,26 @@ public class Transcription {
 	@Column(nullable = false, length = 50)
 	private String provider;
 
+	/**
+	 * Segmentos com timestamp, serializados como JSON. Fica nulo nas
+	 * transcrições geradas antes de este recurso existir.
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "jsonb")
+	private String segments;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
 	protected Transcription() {
 	}
 
-	public Transcription(Meeting meeting, String content, String language, String provider) {
+	public Transcription(Meeting meeting, String content, String language, String provider, String segments) {
 		this.meeting = meeting;
 		this.content = content;
 		this.language = language;
 		this.provider = provider;
+		this.segments = segments;
 	}
 
 	@PrePersist
@@ -75,6 +87,10 @@ public class Transcription {
 
 	public String getProvider() {
 		return provider;
+	}
+
+	public String getSegments() {
+		return segments;
 	}
 
 	public Instant getCreatedAt() {

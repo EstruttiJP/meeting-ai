@@ -33,7 +33,7 @@ class TranscriptionRepositoryTest {
 				new User("google-sub-transcription", "transcription@meetingai.com", "Transcription User", null));
 		Meeting meeting = meetingRepository.saveAndFlush(
 				new Meeting(user, "Reunião de vendas", "reuniao.mp3", "meetings/reuniao.mp3"));
-		Transcription transcription = new Transcription(meeting, "conteúdo transcrito", "pt-BR", "whisper-local");
+		Transcription transcription = new Transcription(meeting, "conteúdo transcrito", "pt-BR", "whisper-local", null);
 
 		transcriptionRepository.saveAndFlush(transcription);
 
