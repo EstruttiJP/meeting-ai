@@ -76,6 +76,19 @@ services:
       PIPEDRIVE_CLIENT_ID:
       PIPEDRIVE_CLIENT_SECRET:
       PIPEDRIVE_REDIRECT_URI:
+      # Ajustes opcionais. Precisam ser repassados aqui explicitamente: o
+      # application.properties até lê essas variáveis, mas o container só
+      # enxerga o que o Compose entrega, então sem esta lista defini-las no
+      # .env não teria efeito nenhum.
+      OPENROUTER_MODEL:
+      OPENROUTER_BASE_URL:
+      GEMINI_MODEL:
+      OPENAI_MODEL:
+      CLAUDE_MODEL:
+      MEETING_RETENTION_DAYS:
+      MEETING_MAX_FILE_SIZE_MB:
+      MEETING_EXPIRATION_CRON:
+      USAGE_QUOTA_DEFAULT_MONTHLY_LIMIT:
     volumes:
       - ./backend:/app
       - backend-m2:/root/.m2

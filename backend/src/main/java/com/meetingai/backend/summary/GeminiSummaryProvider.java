@@ -10,6 +10,9 @@ import org.springframework.web.client.RestClientException;
 
 import com.meetingai.backend.aiprovider.AiProvider;
 
+import com.meetingai.backend.meeting.MeetingType;
+import com.meetingai.backend.transcription.TranscriptionResult;
+
 import jakarta.validation.Validator;
 import tools.jackson.databind.ObjectMapper;
 
@@ -34,8 +37,8 @@ public class GeminiSummaryProvider extends AbstractLlmSummaryProvider implements
 	}
 
 	@Override
-	public SummaryContent summarize(String transcriptionText, String apiKey) {
-		String prompt = buildPrompt(transcriptionText);
+	public SummaryContent summarize(TranscriptionResult transcription, MeetingType meetingType, String apiKey) {
+		String prompt = buildPrompt(transcription, meetingType);
 		GeminiResponse response;
 		try {
 			// Chave vai no header, não na query string: exceções de HTTP client costumam
@@ -50,7 +53,7 @@ public class GeminiSummaryProvider extends AbstractLlmSummaryProvider implements
 		} catch (RestClientException e) {
 			throw new SummaryGenerationException("Falha ao chamar o Gemini", e);
 		}
-		return parseAndValidate(extractText(response));
+		return parseAndValidate(extractText(response), transcription.segments());
 	}
 
 	private String extractText(GeminiResponse response) {

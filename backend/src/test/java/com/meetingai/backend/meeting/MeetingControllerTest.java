@@ -20,6 +20,7 @@ import com.meetingai.backend.user.User;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -47,11 +48,14 @@ class MeetingControllerTest {
 	@MockitoBean
 	private MeetingAccessService meetingAccessService;
 
+	@MockitoBean
+	private MeetingAudioService meetingAudioService;
+
 	private final User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 
 	@Test
 	void listReturnsUsersMeetings() {
-		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		given(currentUserService.getCurrentUser()).willReturn(user);
 		given(meetingAccessService.listForUser(user)).willReturn(java.util.List.of(meeting));
 
@@ -65,7 +69,7 @@ class MeetingControllerTest {
 	@Test
 	void getByIdReturnsOwnedMeeting() {
 		UUID id = UUID.randomUUID();
-		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		given(currentUserService.getCurrentUser()).willReturn(user);
 		given(meetingAccessService.getOwnedMeeting(user, id)).willReturn(meeting);
 
@@ -89,11 +93,11 @@ class MeetingControllerTest {
 	@Test
 	void uploadWithValidRequestReturnsCreatedMeeting() {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
-		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3");
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3", MeetingType.GENERICA);
 		given(currentUserService.getCurrentUser()).willReturn(user);
-		given(meetingUploadService.upload(any(User.class), anyString(), any())).willReturn(meeting);
+		given(meetingUploadService.upload(any(User.class), anyString(), any(), any())).willReturn(meeting);
 
-		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas")))
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas").param("meetingType", "GENERICA")))
 				.hasStatus(HttpStatus.CREATED)
 				.bodyJson()
 				.extractingPath("$.status")
@@ -102,10 +106,34 @@ class MeetingControllerTest {
 	}
 
 	@Test
+	void uploadWithoutMeetingTypeIsRejected() {
+		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
+
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas")))
+				.hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
+	void uploadForwardsTheChosenMeetingTypeToTheService() {
+		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
+		Meeting meeting = new Meeting(user, "Daily", "reuniao.mp3", "user-1/key.mp3", MeetingType.DAILY);
+		given(currentUserService.getCurrentUser()).willReturn(user);
+		given(meetingUploadService.upload(any(User.class), anyString(), any(), any())).willReturn(meeting);
+
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file)
+				.param("title", "Daily").param("meetingType", "DAILY")))
+				.hasStatus(HttpStatus.CREATED)
+				.bodyJson()
+				.extractingPath("$.meetingType")
+				.isEqualTo("DAILY");
+		verify(meetingUploadService).upload(any(User.class), anyString(), any(), eq(MeetingType.DAILY));
+	}
+
+	@Test
 	void uploadWithoutTitleIsRejected() {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
 
-		assertThat(mockMvc.perform(multipart("/api/meetings").file(file)))
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("meetingType", "GENERICA")))
 				.hasStatus(HttpStatus.BAD_REQUEST);
 	}
 
@@ -113,10 +141,10 @@ class MeetingControllerTest {
 	void uploadOverQuotaIsRejectedWithForbidden() {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
 		given(currentUserService.getCurrentUser()).willReturn(user);
-		given(meetingUploadService.upload(any(User.class), anyString(), any()))
+		given(meetingUploadService.upload(any(User.class), anyString(), any(), any()))
 				.willThrow(new UsageQuotaExceededException(10));
 
-		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas")))
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas").param("meetingType", "GENERICA")))
 				.hasStatus(HttpStatus.FORBIDDEN);
 	}
 
@@ -124,10 +152,10 @@ class MeetingControllerTest {
 	void uploadWithUnsupportedFormatIsRejected() {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.txt", "text/plain", "conteudo".getBytes());
 		given(currentUserService.getCurrentUser()).willReturn(user);
-		given(meetingUploadService.upload(any(User.class), anyString(), any()))
+		given(meetingUploadService.upload(any(User.class), anyString(), any(), any()))
 				.willThrow(new UnsupportedMeetingFormatException("reuniao.txt"));
 
-		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas")))
+		assertThat(mockMvc.perform(multipart("/api/meetings").file(file).param("title", "Reunião de vendas").param("meetingType", "GENERICA")))
 				.hasStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
 	}
 

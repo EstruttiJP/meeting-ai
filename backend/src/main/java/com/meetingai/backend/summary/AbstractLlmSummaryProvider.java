@@ -1,6 +1,17 @@
 package com.meetingai.backend.summary;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.meetingai.backend.meeting.MeetingType;
+import com.meetingai.backend.transcription.TranscriptionResult;
+import com.meetingai.backend.transcription.TranscriptionSegment;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -17,25 +28,43 @@ import jakarta.validation.Validator;
 abstract class AbstractLlmSummaryProvider {
 
 	private static final String PROMPT_TEMPLATE = """
-			Você é um assistente que extrai informações estruturadas de transcrições de reuniões comerciais.
-			Analise a transcrição abaixo e devolva SOMENTE um JSON válido (sem texto antes ou depois, sem blocos \
-			de código markdown), exatamente com este formato:
+			Você é um assistente que ajuda a documentar reuniões. Analise a transcrição abaixo e devolva \
+			SOMENTE um JSON válido (sem texto antes ou depois, sem blocos de código markdown), exatamente \
+			com este formato:
 
 			{
 			  "summary": "resumo objetivo da reunião em um parágrafo",
-			  "decisions": ["decisão 1", "decisão 2"],
-			  "nextSteps": ["próximo passo 1", "próximo passo 2"],
-			  "mentionedValues": ["valor mencionado 1", "valor mencionado 2"],
-			  "paymentMethod": "forma de pagamento citada, ou null se não houver",
-			  "objections": ["objeção 1", "objeção 2"]
+			  "items": [
+			    {"type": "decisao", "content": "o que foi decidido", "timestampSeconds": 12, "priority": "alta"},
+			    {"type": "proximo_passo", "content": "o que ficou combinado fazer", "timestampSeconds": 45, "priority": "normal"},
+			    {"type": "valor_mencionado", "content": "número, prazo ou valor citado", "timestampSeconds": 60},
+			    {"type": "ponto_atencao", "content": "risco, dúvida ou objeção levantada", "timestampSeconds": 90}
+			  ]
 			}
 
-			Se uma lista não tiver itens, devolva uma lista vazia []. O campo "summary" é obrigatório e nunca \
-			pode ficar vazio.
+			O campo "type" só aceita estes quatro valores: decisao, proximo_passo, valor_mencionado, \
+			ponto_atencao. O campo "summary" é obrigatório e nunca pode ficar vazio. Se a reunião não tiver \
+			nenhum item de um tipo, simplesmente não inclua itens daquele tipo — não invente conteúdo para \
+			preencher.
+
+			O campo "priority" ("alta" ou "normal") vale SOMENTE para decisao e proximo_passo; não inclua \
+			esse campo nos outros dois tipos. Marque como "alta" apenas o que for realmente crítico ou \
+			urgente para o andamento do trabalho — no máximo um ou dois itens da reunião inteira. Se nada \
+			se destacar de verdade, marque tudo como "normal": é melhor não ter destaque do que eleger um \
+			item qualquer.
+
+			Cada linha da transcrição começa com o tempo em que ela foi dita, no formato [MM:SS]. Para cada \
+			item extraído, "timestampSeconds" deve ser o tempo EM SEGUNDOS da linha onde aquilo foi dito — \
+			converta [MM:SS] para segundos (ex.: [01:30] vira 90). Use sempre o tempo de uma linha que existe \
+			na transcrição; nunca estime ou invente um tempo que não venha de uma linha.
+
+			%s
 
 			Transcrição:
 			%s
 			""";
+
+	private static final int RAW_RESPONSE_LOG_LIMIT = 500;
 
 	private final ObjectMapper objectMapper;
 	private final Validator validator;
@@ -45,30 +74,147 @@ abstract class AbstractLlmSummaryProvider {
 		this.validator = validator;
 	}
 
-	protected String buildPrompt(String transcriptionText) {
-		return PROMPT_TEMPLATE.formatted(transcriptionText);
+	/**
+	 * A ênfase por tipo de reunião muda o que o modelo deve caçar com mais peso,
+	 * nunca a estrutura do resultado — os quatro tipos de item continuam os
+	 * mesmos, e o JSON pedido é idêntico em todos os casos.
+	 */
+	private static final Map<MeetingType, String> EMPHASIS_BY_TYPE = Map.of(
+			MeetingType.FECHAMENTO, """
+					Esta é uma reunião de fechamento de negócio. Priorize valores, condições comerciais, \
+					prazos e o que foi de fato acordado: valor_mencionado e decisao são os tipos mais \
+					importantes aqui. Registre como ponto_atencao qualquer hesitação ou objeção do cliente.""",
+			MeetingType.DAILY, """
+					Esta é uma daily/alinhamento de time. Priorize o que cada pessoa ficou de fazer e o que \
+					está travando o trabalho: proximo_passo e ponto_atencao são os tipos mais importantes \
+					aqui. Não force valor_mencionado — números soltos numa daily raramente têm peso, então \
+					só registre um valor se ele for claramente relevante (um prazo firmado, por exemplo).""",
+			MeetingType.APRESENTACAO, """
+					Esta é uma apresentação/pitch. Priorize as decisões tomadas depois da apresentação e as \
+					dúvidas e objeções levantadas pela audiência: decisao e ponto_atencao são os tipos mais \
+					importantes aqui. Registre valores só quando fizerem parte de uma proposta concreta.""",
+			MeetingType.GENERICA, """
+					Esta é uma reunião de pauta variada. Trate os quatro tipos de item com o mesmo peso e \
+					extraia o que realmente aparecer na conversa.""");
+
+	protected String buildPrompt(TranscriptionResult transcription, MeetingType meetingType) {
+		String emphasis = EMPHASIS_BY_TYPE.getOrDefault(
+				meetingType == null ? MeetingType.GENERICA : meetingType,
+				EMPHASIS_BY_TYPE.get(MeetingType.GENERICA));
+		return PROMPT_TEMPLATE.formatted(emphasis, formatTranscript(transcription));
 	}
 
-	protected SummaryContent parseAndValidate(String rawResponse) {
+	/**
+	 * Sem segmentos (transcrição antiga, ou provider que não devolve tempo) o
+	 * texto vai puro: o modelo continua extraindo itens, só não consegue ancorar
+	 * no áudio, e os timestamps saem nulos na normalização.
+	 */
+	private static String formatTranscript(TranscriptionResult transcription) {
+		if (transcription.segments().isEmpty()) {
+			return transcription.content();
+		}
+		return transcription.segments().stream()
+				.map(segment -> "[%s] %s".formatted(formatTimestamp(segment.startSeconds()), segment.text()))
+				.collect(Collectors.joining("\n"));
+	}
+
+	private static String formatTimestamp(double seconds) {
+		int total = (int) Math.round(seconds);
+		return String.format(Locale.ROOT, "%02d:%02d", total / 60, total % 60);
+	}
+
+	protected SummaryContent parseAndValidate(String rawResponse, List<TranscriptionSegment> segments) {
 		String json = extractJson(rawResponse);
 		SummaryContent content;
 		try {
 			content = objectMapper.readValue(json, SummaryContent.class);
 		} catch (JacksonException e) {
-			throw new SummaryGenerationException(
-					"Resposta do modelo não é um JSON válido no formato esperado", e);
+			throw new SummaryFormatException(
+					"Resposta do modelo não é um JSON válido no formato esperado. Resposta bruta: "
+							+ truncate(rawResponse), e);
 		}
+		content = normalize(content, segments);
+
 		Set<ConstraintViolation<SummaryContent>> violations = validator.validate(content);
 		if (!violations.isEmpty()) {
-			throw new SummaryGenerationException(
-					"Resposta do modelo não atende ao schema esperado: " + violations);
+			String campos = violations.stream()
+					.map(v -> v.getPropertyPath() + " " + v.getMessage())
+					.collect(Collectors.joining("; "));
+			throw new SummaryFormatException(
+					"Resposta do modelo não atende ao schema esperado (" + campos + "). Resposta bruta: "
+							+ truncate(rawResponse));
 		}
 		return content;
 	}
 
+	/**
+	 * Ajusta o que o modelo não tem como garantir sozinho: id único por item
+	 * (a edição granular depende disso) e timestamp ancorado num segmento que
+	 * existe de verdade.
+	 */
+	private static SummaryContent normalize(SummaryContent content, List<TranscriptionSegment> segments) {
+		List<SummaryItem> normalized = new ArrayList<>();
+		Set<String> usedIds = new HashSet<>();
+		int nextGeneratedId = 1;
+
+		for (SummaryItem item : content.items()) {
+			String id = item.id();
+			if (id == null || id.isBlank() || !usedIds.add(id)) {
+				while (!usedIds.add("item-" + nextGeneratedId)) {
+					nextGeneratedId++;
+				}
+				id = "item-" + nextGeneratedId;
+			}
+			normalized.add(new SummaryItem(id, item.type(), item.content(),
+					anchorToSegment(item.timestampSeconds(), segments),
+					normalizePriority(item)));
+		}
+		return new SummaryContent(content.summary(), normalized);
+	}
+
+	/**
+	 * Prioridade só sobrevive em decisão e próximo passo — nos outros tipos ela é
+	 * descartada mesmo que o modelo tenha mandado. Ausente vira NORMAL, para o
+	 * "é destaque?" ser sempre uma comparação simples, sem nulo no meio.
+	 */
+	private static SummaryItemPriority normalizePriority(SummaryItem item) {
+		if (!item.canBeHighlighted()) {
+			return null;
+		}
+		return item.priority() == null ? SummaryItemPriority.NORMAL : item.priority();
+	}
+
+	/**
+	 * Reancora o tempo proposto pelo modelo no início do segmento mais próximo,
+	 * garantindo que todo timestamp salvo veio de um trecho que existe de fato
+	 * na gravação. Sem segmentos não há o que conferir, então o tempo é
+	 * descartado — melhor item sem âncora do que âncora inventada.
+	 */
+	private static Double anchorToSegment(Double proposed, List<TranscriptionSegment> segments) {
+		if (proposed == null || segments == null || segments.isEmpty()) {
+			return null;
+		}
+		return segments.stream()
+				.min(Comparator.comparingDouble(segment -> Math.abs(segment.startSeconds() - proposed)))
+				.map(TranscriptionSegment::startSeconds)
+				.orElse(null);
+	}
+
+	/**
+	 * Trunca porque a resposta bruta vai parar no log e em
+	 * {@code meeting.failure_reason} — o suficiente para diagnosticar o formato
+	 * sem despejar a transcrição inteira.
+	 */
+	private static String truncate(String rawResponse) {
+		String flat = rawResponse.strip().replaceAll("\\s+", " ");
+		return flat.length() <= RAW_RESPONSE_LOG_LIMIT
+				? flat
+				: flat.substring(0, RAW_RESPONSE_LOG_LIMIT) + "...(truncado)";
+	}
+
 	private String extractJson(String rawResponse) {
 		if (rawResponse == null || rawResponse.isBlank()) {
-			throw new SummaryGenerationException("Resposta vazia do modelo de IA");
+			throw new SummaryFormatException("Resposta vazia do modelo de IA");
 		}
 		String trimmed = rawResponse.trim();
 		if (trimmed.startsWith("```")) {

@@ -44,13 +44,16 @@ class MeetingPipelineSteps {
 		Meeting meeting = getMeetingOrThrow(meetingId);
 		meeting.markTranscribing();
 		meetingRepository.save(meeting);
-		return new PipelineContext(meeting.getStorageKey(), meeting.getOriginalFilename(), meeting.getUser().getId());
+		return new PipelineContext(meeting.getStorageKey(), meeting.getOriginalFilename(),
+				meeting.getUser().getId(), meeting.getMeetingType());
 	}
 
 	@Transactional
 	void saveTranscriptionAndMarkSummarizing(UUID meetingId, TranscriptionResult result, String providerName) {
 		Meeting meetingRef = meetingRepository.getReferenceById(meetingId);
-		transcriptionRepository.save(new Transcription(meetingRef, result.content(), result.language(), providerName));
+		String segmentsJson = result.segments().isEmpty() ? null : objectMapper.writeValueAsString(result.segments());
+		transcriptionRepository.save(
+				new Transcription(meetingRef, result.content(), result.language(), providerName, segmentsJson));
 
 		Meeting meeting = getMeetingOrThrow(meetingId);
 		meeting.markSummarizing();
@@ -68,9 +71,9 @@ class MeetingPipelineSteps {
 	}
 
 	@Transactional
-	void markFailed(UUID meetingId) {
+	void markFailed(UUID meetingId, MeetingFailureCategory category, String reason) {
 		meetingRepository.findById(meetingId).ifPresent(meeting -> {
-			meeting.markFailed();
+			meeting.markFailed(category, reason);
 			meetingRepository.save(meeting);
 		});
 	}
@@ -80,7 +83,7 @@ class MeetingPipelineSteps {
 				.orElseThrow(() -> new IllegalStateException("Meeting não encontrada: " + meetingId));
 	}
 
-	record PipelineContext(String storageKey, String originalFilename, UUID userId) {
+	record PipelineContext(String storageKey, String originalFilename, UUID userId, MeetingType meetingType) {
 	}
 
 }

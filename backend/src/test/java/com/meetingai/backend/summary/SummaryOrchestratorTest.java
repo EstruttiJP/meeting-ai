@@ -9,6 +9,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.meeting.MeetingType;
+import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.aiprovider.AiProviderConfig;
 import com.meetingai.backend.aiprovider.AiProviderConfigRepository;
 import com.meetingai.backend.crypto.EncryptionService;
@@ -39,13 +41,16 @@ class SummaryOrchestratorTest {
 	@Mock
 	private UserKeySummaryProvider geminiProvider;
 
+	private static final TranscriptionResult TRANSCRICAO =
+			new TranscriptionResult("transcrição", "pt", List.of());
+
 	private User user;
 	private SummaryContent expectedContent;
 
 	@BeforeEach
 	void setUp() {
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		expectedContent = new SummaryContent("resumo", List.of(), List.of(), List.of(), null, List.of());
+		expectedContent = new SummaryContent("resumo", List.of());
 	}
 
 	private SummaryOrchestrator orchestratorWith(UserKeySummaryProvider... providers) {
@@ -57,10 +62,10 @@ class SummaryOrchestratorTest {
 	@Test
 	void usesDefaultProviderWhenUserHasNoAiProviderConfig() {
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of());
-		given(defaultProvider.summarize("transcrição")).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, "transcrição");
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
 	}
@@ -69,10 +74,10 @@ class SummaryOrchestratorTest {
 	void usesDefaultProviderWhenDefaultConfigIsOpenRouter() {
 		AiProviderConfig config = new AiProviderConfig(user, AiProvider.OPENROUTER, null, true);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
-		given(defaultProvider.summarize("transcrição")).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, "transcrição");
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
 	}
@@ -82,25 +87,25 @@ class SummaryOrchestratorTest {
 		AiProviderConfig config = new AiProviderConfig(user, AiProvider.GEMINI, "encrypted-key", true);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
 		given(encryptionService.decrypt("encrypted-key")).willReturn("plain-key");
-		given(geminiProvider.summarize("transcrição", "plain-key")).willReturn(expectedContent);
+		given(geminiProvider.summarize(TRANSCRICAO, MeetingType.GENERICA, "plain-key")).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, "transcrição");
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
-		verify(defaultProvider, never()).summarize(any());
+		verify(defaultProvider, never()).summarize(any(), any());
 	}
 
 	@Test
 	void ignoresNonDefaultConfigsAndFallsBackToDefaultProvider() {
 		AiProviderConfig nonDefault = new AiProviderConfig(user, AiProvider.GEMINI, "encrypted-key", false);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(nonDefault));
-		given(defaultProvider.summarize("transcrição")).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		orchestrator.summarize(user, "transcrição");
+		orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
-		verify(geminiProvider, never()).summarize(any(), any());
+		verify(geminiProvider, never()).summarize(any(), any(), any());
 	}
 
 	@Test
@@ -109,7 +114,7 @@ class SummaryOrchestratorTest {
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		assertThatThrownBy(() -> orchestrator.summarize(user, "transcrição"))
+		assertThatThrownBy(() -> orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA))
 				.isInstanceOf(SummaryGenerationException.class);
 	}
 

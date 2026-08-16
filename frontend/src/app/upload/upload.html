@@ -1,0 +1,140 @@
+<div>
+  <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Nova reunião</h1>
+  <p class="text-sm text-slate-500 dark:text-slate-400">
+    Envie o áudio ou vídeo da reunião para gerar a transcrição e o resumo automaticamente.
+  </p>
+
+  <div class="mt-6 max-w-xl">
+    @if (quotaLoading()) {
+      <app-loading-state message="Carregando limite de uso..." />
+    } @else if (quotaError(); as message) {
+      <app-error-state [message]="message" (retry)="loadQuota()" />
+    } @else if (quota(); as q) {
+      <div class="mb-6 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-medium text-slate-700 dark:text-slate-200">Uso do mês</span>
+          <span class="text-slate-500 dark:text-slate-400">
+            {{ q.meetingsUploaded }} de {{ q.meetingsLimit }} reuniões
+          </span>
+        </div>
+        <p-progressbar [value]="quotaPercent()" [showValue]="false" styleClass="mt-2 h-2" />
+        @if (quotaExhausted()) {
+          <p class="mt-2 text-sm text-red-600 dark:text-red-400">
+            Limite mensal atingido. Aguarde o próximo mês ou faça upgrade de plano.
+          </p>
+        }
+      </div>
+
+      <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200" for="title">
+        Título da reunião
+      </label>
+      <input
+        id="title"
+        type="text"
+        name="title"
+        [(ngModel)]="title"
+        placeholder="Ex.: Kickoff com Cliente Horizonte"
+        class="mb-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      />
+
+      <!-- Tipo antes do arquivo: muda a ênfase da extração, e escolher depois do
+           upload seria tarde — o pipeline já teria começado. -->
+      <fieldset class="mb-4">
+        <legend class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+          Que tipo de reunião é essa?
+        </legend>
+        <div class="grid gap-2 sm:grid-cols-2">
+          @for (option of typeOptions; track option.value) {
+            <label
+              class="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition-colors"
+              [class.border-emerald-500]="meetingType() === option.value"
+              [class.bg-emerald-50]="meetingType() === option.value"
+              [class.dark:bg-emerald-950]="meetingType() === option.value"
+              [class.border-slate-200]="meetingType() !== option.value"
+              [class.dark:border-slate-800]="meetingType() !== option.value"
+            >
+              <input
+                type="radio"
+                name="meetingType"
+                class="mt-1"
+                [value]="option.value"
+                [checked]="meetingType() === option.value"
+                (change)="meetingType.set(option.value)"
+              />
+              <span>
+                <span class="block text-sm font-medium text-slate-800 dark:text-slate-100">{{ option.label }}</span>
+                <span class="block text-xs text-slate-500 dark:text-slate-400">{{ option.hint }}</span>
+              </span>
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <div
+        role="button"
+        [attr.tabindex]="canPickFile() ? 0 : -1"
+        [attr.aria-disabled]="!canPickFile()"
+        (click)="browseFiles()"
+        (keydown.enter)="browseFiles()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+        class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors"
+        [class.cursor-pointer]="canPickFile()"
+        [class.cursor-not-allowed]="!canPickFile()"
+        [class.opacity-60]="!canPickFile()"
+        [class.border-emerald-500]="isDraggingOver() && canPickFile()"
+        [class.bg-emerald-50]="isDraggingOver() && canPickFile()"
+        [class.border-slate-300]="!isDraggingOver()"
+        [class.dark:border-slate-700]="!isDraggingOver()"
+        [class.dark:bg-emerald-950]="isDraggingOver() && canPickFile()"
+      >
+        <i class="pi pi-cloud-upload text-3xl text-slate-400"></i>
+        @if (selectedFile(); as file) {
+          <p class="font-medium text-slate-900 dark:text-slate-100">{{ file.name }}</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{{ (file.size / 1024 / 1024).toFixed(1) }} MB</p>
+          <p-button
+            label="Remover"
+            icon="pi pi-times"
+            size="small"
+            severity="secondary"
+            text="true"
+            (onClick)="clearFile(); $event.stopPropagation()"
+          />
+        } @else if (!canPickFile()) {
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            Escolha o tipo da reunião acima para liberar o envio do arquivo.
+          </p>
+        } @else {
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            Arraste o arquivo aqui ou <span class="font-medium text-emerald-600 dark:text-emerald-400">clique para selecionar</span>
+          </p>
+          <p class="text-xs text-slate-400">Formatos aceitos: mp3, mp4, wav, m4a</p>
+        }
+        <input
+          #fileInput
+          type="file"
+          accept=".mp3,.mp4,.wav,.m4a"
+          class="hidden"
+          (change)="onFileInputChange($event)"
+        />
+      </div>
+      @if (fileError(); as message) {
+        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+
+      @if (submitError(); as message) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+
+      <p-button
+        [label]="submitting() ? 'Enviando...' : 'Enviar reunião'"
+        icon="pi pi-send"
+        styleClass="w-full mt-6"
+        [disabled]="!canSubmit()"
+        [loading]="submitting()"
+        (onClick)="submit()"
+      />
+    }
+  </div>
+</div>

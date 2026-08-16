@@ -10,6 +10,9 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.meeting.MeetingType;
+import com.meetingai.backend.transcription.TranscriptionResult;
+import com.meetingai.backend.transcription.TranscriptionSegment;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -29,6 +32,11 @@ class OpenAiSummaryProviderTest {
 	private MockRestServiceServer mockServer;
 	private OpenAiSummaryProvider provider;
 
+	private static final TranscriptionResult TRANSCRICAO = new TranscriptionResult(
+			"texto completo", "pt",
+			List.of(new TranscriptionSegment(0, 8, "Abertura"),
+					new TranscriptionSegment(30, 38, "Meio da conversa")));
+
 	@BeforeEach
 	void setUp() {
 		RestClient.Builder builder = RestClient.builder();
@@ -45,14 +53,13 @@ class OpenAiSummaryProviderTest {
 	@Test
 	void summarizesValidJsonResponse() {
 		Map<String, Object> message = Map.of("role", "assistant", "content", """
-				{"summary": "Follow-up agendado", "decisions": [], "nextSteps": [], "mentionedValues": [], \
-				"paymentMethod": null, "objections": []}
+				{"summary": "Follow-up agendado", "items": []}
 				""");
 		Map<String, Object> body = Map.of("choices", List.of(Map.of("message", message)));
 		mockServer.expect(requestTo(containsString("/chat/completions")))
 				.andRespond(withSuccess(objectMapper.writeValueAsString(body), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize("transcrição", "user-api-key");
+		SummaryContent content = provider.summarize(TRANSCRICAO, MeetingType.GENERICA, "user-api-key");
 
 		assertThat(content.summary()).isEqualTo("Follow-up agendado");
 	}

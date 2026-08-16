@@ -1,5 +1,8 @@
 package com.meetingai.backend.summary;
 
+import com.meetingai.backend.meeting.MeetingType;
+import com.meetingai.backend.transcription.TranscriptionResult;
+
 /**
  * Gera o resumo estruturado a partir da transcrição, usando o provider
  * padrão (mantido pela própria aplicação, hoje OpenRouter no plano free).
@@ -7,6 +10,6 @@ package com.meetingai.backend.summary;
  */
 public interface SummaryProvider {
 
-	SummaryContent summarize(String transcriptionText);
+	SummaryContent summarize(TranscriptionResult transcription, MeetingType meetingType);
 
 }

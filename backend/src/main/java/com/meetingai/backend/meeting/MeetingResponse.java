@@ -8,19 +8,26 @@ public record MeetingResponse(
 		String title,
 		String originalFilename,
 		MeetingStatus status,
+		MeetingType meetingType,
 		Instant uploadedAt,
 		Instant expiresAt,
-		Instant sentToCrmAt) {
+		Instant sentToCrmAt,
+		MeetingFailureCategory failureCategory) {
 
+	// failureReason fica de fora de propósito: é mensagem técnica (às vezes com
+	// trecho da resposta bruta do modelo) para log e diagnóstico, não para o
+	// usuário final — o frontend monta o texto amigável a partir da categoria.
 	public static MeetingResponse from(Meeting meeting) {
 		return new MeetingResponse(
 				meeting.getId(),
 				meeting.getTitle(),
 				meeting.getOriginalFilename(),
 				meeting.getStatus(),
+				meeting.getMeetingType(),
 				meeting.getUploadedAt(),
 				meeting.getExpiresAt(),
-				meeting.getSentToCrmAt());
+				meeting.getSentToCrmAt(),
+				meeting.getFailureCategory());
 	}
 
 }

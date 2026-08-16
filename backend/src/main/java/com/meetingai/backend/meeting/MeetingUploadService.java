@@ -47,7 +47,7 @@ public class MeetingUploadService {
 	}
 
 	@Transactional
-	public Meeting upload(User user, String title, MultipartFile file) {
+	public Meeting upload(User user, String title, MultipartFile file, MeetingType meetingType) {
 		String originalFilename = file.getOriginalFilename();
 		validateFormat(originalFilename);
 		validateSize(file.getSize());
@@ -62,7 +62,7 @@ public class MeetingUploadService {
 			throw new StorageException("Falha ao ler o arquivo enviado", e);
 		}
 
-		Meeting meeting = new Meeting(user, title, originalFilename, storageKey);
+		Meeting meeting = new Meeting(user, title, originalFilename, storageKey, meetingType);
 		// Vida útil do áudio bruto começa a contar do upload, não do fim do pipeline —
 		// mesmo uma reunião que trava em TRANSCRIBING deve expirar depois de N dias.
 		meeting.scheduleExpiration(Instant.now().plus(retentionDays, ChronoUnit.DAYS));

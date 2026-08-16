@@ -6,7 +6,9 @@ pipeline principal (login com Google, upload, transcrição via Whisper,
 resumo estruturado via LLM, revisão, envio ao Pipedrive, expiração
 automática do áudio) já roda de ponta a ponta contra o ambiente local —
 ver [`docs/api-endpoints.md`](docs/api-endpoints.md) para o contrato de
-API completo.
+API completo. O frontend Angular cobre as seis telas desse fluxo (login,
+dashboard, upload, progresso, revisão do resumo, configurações), todas
+ligadas à API real.
 
 O plano de produto completo (etapas futuras: transcrição, resumo via LLM,
 integração com CRM, deploy em AWS) está em [`PLAIN.md`](PLAIN.md). As
@@ -18,7 +20,7 @@ decisões de arquitetura tomadas ao longo do caminho ficam registradas em
 ```mermaid
 flowchart LR
     subgraph Docker Compose
-        FE["frontend<br/>Angular + Tailwind<br/>:4200"]
+        FE["frontend<br/>Angular + Tailwind + PrimeNG<br/>:4200"]
         BE["backend<br/>Spring Boot<br/>:8080"]
         PG[("postgres<br/>:5432")]
         LS["localstack<br/>S3 + SQS<br/>:4566"]
@@ -29,7 +31,7 @@ flowchart LR
     PD(["Pipedrive"])
 
     Browser(["navegador"]) --> FE
-    FE -- "GET /api/health" --> BE
+    FE -- "REST /api/** (sessão via cookie, login Google OAuth2)" --> BE
     BE --> PG
     BE -- "transcrição" --> WH
     BE -. "resumo estruturado" .-> OR
@@ -66,8 +68,10 @@ Isso sobe 5 serviços, sem nenhum passo manual adicional:
 | `localstack` | http://localhost:4566   | S3 + SQS locais, já com bucket e fila criados (reservado pra Etapa 4) |
 | `whisper`  | http://localhost:9000    | transcrição local (faster-whisper), sem custo de AWS |
 
-Abra http://localhost:4200 — a tela inicial mostra se o frontend conseguiu
-falar com o `GET /api/health` do backend.
+Abra http://localhost:4200 — sem sessão ativa, o guard de rota redireciona
+direto pra tela de login (`/login`); o botão "Entrar com Google" navega pra
+`/oauth2/authorization/google` no próprio backend, que é quem conduz o
+fluxo OAuth2.
 
 Os defaults do `.env.example` sobem o ambiente e deixam todo o pipeline
 compilando/testável, mas algumas features só funcionam de verdade com
@@ -77,6 +81,53 @@ Google Cloud Console; resumo via LLM (plano free) exige
 `OPENROUTER_API_KEY`; envio ao CRM exige `PIPEDRIVE_CLIENT_ID`/`PIPEDRIVE_CLIENT_SECRET`
 de um app Pipedrive. Sem isso, o backend sobe normalmente — só a chamada
 externa específica falha com uma mensagem clara.
+
+O client id do Pipedrive é o único segredo que o **frontend** também precisa
+conhecer (é público por natureza — só o client secret fica só no backend,
+usado na troca do código OAuth por token): a tela de Configurações usa
+`frontend/src/environments/environment.ts` (`pipedrive.clientId`) pra montar
+a URL de autorização e redirecionar o navegador pra lá. Diferente das
+variáveis do backend, esse valor não vem do `.env` — é preciso editar o
+arquivo diretamente e restartar o `ng serve`. Sem ele, o botão "Conectar
+Pipedrive" fica escondido em vez de levar pra um redirect quebrado.
+
+### Variáveis de ambiente
+
+A referência completa — o que cada variável faz, onde obter o valor e o que
+acontece sem ela — vive no [`.env.example`](.env.example), comentada linha a
+linha. O resumo:
+
+| Variável | Precisa? | Sem ela |
+|----------|----------|---------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | opcional | usa `postgres`/`postgres`/`meetingai` |
+| `LOCALSTACK_DEBUG`, `S3_BUCKET_NAME`, `SQS_QUEUE_NAME` | opcional | defaults do Compose |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` | opcional | `test`/`test`/`us-east-1` — o LocalStack não valida credencial |
+| `WHISPER_MODEL` | opcional | `base`; `small`+ transcreve melhor em português e mais devagar |
+| `FRONTEND_URL` | opcional | `http://localhost:4200` (origem do CORS e redirect pós-login) |
+| **`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`** | **sim** | não existe login — e toda rota `/api/**` exige sessão |
+| **`APP_ENCRYPTION_KEY` / `APP_ENCRYPTION_SALT`** | **sim** | cai num placeholder commitado (público) para criptografar chave de IA e token de CRM |
+| **`OPENROUTER_API_KEY`** | **sim** | transcrição funciona, resumo falha e a reunião termina em `FAILED` |
+| `OPENROUTER_MODEL` / `OPENROUTER_BASE_URL` | opcional | `openai/gpt-oss-20b:free` |
+| `GEMINI_MODEL` / `OPENAI_MODEL` / `CLAUDE_MODEL` | opcional | só afeta quem configurou chave própria |
+| `PIPEDRIVE_CLIENT_ID` / `PIPEDRIVE_CLIENT_SECRET` / `PIPEDRIVE_REDIRECT_URI` | opcional | tudo funciona, menos o envio ao CRM |
+| `MEETING_RETENTION_DAYS` / `MEETING_MAX_FILE_SIZE_MB` / `MEETING_EXPIRATION_CRON` | opcional | `7` dias / `200` MB / de hora em hora |
+| `USAGE_QUOTA_DEFAULT_MONTHLY_LIMIT` | opcional | `10` uploads por usuário/mês |
+
+Dois detalhes que custam tempo quando passam despercebidos:
+
+- **Deixar em branco não é o mesmo que omitir.** `MEETING_RETENTION_DAYS=`
+  entrega string vazia ao container, e o default do Spring não entra — no caso
+  de variável numérica, o backend nem sobe. Para usar o default, comente a linha
+  (é assim que as opcionais vêm no `.env.example`).
+- **Variável nova precisa ser repassada no `docker-compose.yml`**, no bloco
+  `environment:` do serviço `backend`. O `application.properties` até lê, mas o
+  container só enxerga o que o Compose entrega.
+
+Sobre `APP_ENCRYPTION_KEY`/`APP_ENCRYPTION_SALT`: trocar esses valores torna
+ilegível tudo que já foi criptografado com os anteriores — os usuários precisam
+colar a chave de IA de novo e reconectar o CRM. Gere um par por ambiente
+(`openssl rand -base64 32` e `openssl rand -hex 16`) e não rotacione sem
+planejar a migração.
 
 ### Hot-reload
 

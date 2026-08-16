@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.meetingai.backend.crypto.EncryptionService;
 import com.meetingai.backend.meeting.Meeting;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.meeting.MeetingAccessService;
 import com.meetingai.backend.meeting.MeetingRepository;
 import com.meetingai.backend.summary.Summary;
@@ -62,7 +63,7 @@ class CrmSyncServiceTest {
 				crmConnectionRepository, encryptionService, pipedriveClient, JsonMapper.builder().build());
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 		ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
-		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		meetingId = UUID.randomUUID();
 		ReflectionTestUtils.setField(meeting, "id", meetingId);
 		given(meetingAccessService.getOwnedMeeting(user, meetingId)).willReturn(meeting);

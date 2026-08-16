@@ -1,0 +1,328 @@
+<div class="mx-auto max-w-2xl">
+  @if (loading()) {
+    <app-loading-state message="Carregando resumo..." />
+  } @else if (errorMessage(); as message) {
+    <app-error-state [message]="message" (retry)="load()" />
+  } @else if (meeting(); as m) {
+    <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ m.title }}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      Revise o resumo gerado pela IA antes de aprovar. Nada é enviado ao CRM sem essa revisão.
+    </p>
+
+    @if (alreadySentToCrm()) {
+      <div
+        class="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+      >
+        <i class="pi pi-check-circle"></i>
+        <span>Já enviado ao CRM{{ m.sentToCrmAt ? ' em ' + (m.sentToCrmAt | date: 'dd/MM/yyyy HH:mm') : '' }}.</span>
+      </div>
+    }
+
+    <!-- Player fica acima das abas de propósito: continua tocando ao trocar de aba,
+         e o botão de timestamp funciona a partir das duas. -->
+    @if (audioExpired()) {
+      <div
+        class="mt-6 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+      >
+        <i class="pi pi-volume-off mt-0.5"></i>
+        <span>
+          O áudio original foi removido após o período de retenção, então não dá mais para ouvir a
+          gravação. O resumo e os itens continuam disponíveis para revisão.
+        </span>
+      </div>
+    } @else {
+      <audio
+        #player
+        class="mt-6 w-full"
+        controls
+        preload="metadata"
+        crossorigin="use-credentials"
+        [src]="audioSrc()"
+        (timeupdate)="onTimeUpdate($event)"
+        (error)="onAudioError()"
+      ></audio>
+    }
+
+    @if (content(); as c) {
+      <div class="mt-6 flex gap-1 border-b border-slate-200 dark:border-slate-800" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="activeTab() === 'resumo'"
+          class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
+          [class.border-emerald-500]="activeTab() === 'resumo'"
+          [class.text-emerald-700]="activeTab() === 'resumo'"
+          [class.dark:text-emerald-400]="activeTab() === 'resumo'"
+          [class.border-transparent]="activeTab() !== 'resumo'"
+          [class.text-slate-500]="activeTab() !== 'resumo'"
+          (click)="activeTab.set('resumo')"
+        >
+          Resumo
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="activeTab() === 'linha-do-tempo'"
+          class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
+          [class.border-emerald-500]="activeTab() === 'linha-do-tempo'"
+          [class.text-emerald-700]="activeTab() === 'linha-do-tempo'"
+          [class.dark:text-emerald-400]="activeTab() === 'linha-do-tempo'"
+          [class.border-transparent]="activeTab() !== 'linha-do-tempo'"
+          [class.text-slate-500]="activeTab() !== 'linha-do-tempo'"
+          (click)="activeTab.set('linha-do-tempo')"
+        >
+          Linha do tempo
+        </button>
+      </div>
+
+      @if (itemError(); as message) {
+        <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+
+      @if (activeTab() === 'resumo') {
+        <!-- Card de destaque: só aparece com algo marcado como prioridade alta. -->
+        @if (highlightItem(); as destaque) {
+          <div
+            class="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950"
+          >
+            <div class="flex items-center gap-2">
+              <i class="pi pi-star-fill text-amber-500"></i>
+              <span class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Destaque · {{ typeLabels[destaque.type] }}
+              </span>
+            </div>
+            <p class="mt-2 text-sm font-medium text-slate-800 dark:text-slate-100">{{ destaque.content }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              @if (destaque.timestampSeconds !== null && !audioExpired()) {
+                <p-button
+                  label="Ouvir na gravação"
+                  size="small"
+                  severity="secondary"
+                  icon="pi pi-play-circle"
+                  (onClick)="openInTimeline(destaque)"
+                />
+              }
+              <p-button
+                label="Tirar do destaque"
+                size="small"
+                severity="secondary"
+                [text]="true"
+                (onClick)="togglePriority(destaque)"
+              />
+            </div>
+          </div>
+        }
+
+        <div class="mt-6">
+          <div class="mb-1 flex items-center justify-between">
+            <h2 class="text-sm font-medium text-slate-700 dark:text-slate-200">Resumo</h2>
+            @if (summaryDraft() === null) {
+              <button
+                type="button"
+                class="text-xs text-emerald-700 hover:underline dark:text-emerald-400"
+                (click)="startEditingSummary()"
+              >
+                Editar
+              </button>
+            }
+          </div>
+
+          @if (summaryDraft(); as draft) {
+            <textarea
+              rows="4"
+              [ngModel]="draft"
+              (ngModelChange)="summaryDraft.set($event)"
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            ></textarea>
+            <div class="mt-2 flex gap-2">
+              <p-button label="Salvar resumo" size="small" (onClick)="saveSummaryText()" />
+              <p-button label="Cancelar" size="small" severity="secondary" (onClick)="cancelEditingSummary()" />
+            </div>
+          } @else {
+            <p class="whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{{ c.summary }}</p>
+          }
+        </div>
+
+        <!-- Grupos colapsados por padrão: a aba abre mostrando o mapa da reunião,
+             não 18 itens de uma vez. -->
+        <div class="mt-6 flex flex-col gap-2">
+          @for (group of groups(); track group.type) {
+            <div class="rounded-lg border border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-slate-700 dark:text-slate-200"
+                [attr.aria-expanded]="isGroupExpanded(group.type)"
+                (click)="toggleGroup(group.type)"
+              >
+                <i class="pi text-xs" [class.pi-chevron-right]="!isGroupExpanded(group.type)" [class.pi-chevron-down]="isGroupExpanded(group.type)"></i>
+                <span>{{ group.label }}</span>
+                <span
+                  class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  {{ group.items.length }}
+                </span>
+              </button>
+
+              @if (isGroupExpanded(group.type)) {
+                <ul class="flex flex-col gap-2 border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+                  @for (item of group.items; track item.id) {
+                    <li>
+                      <ng-container
+                        *ngTemplateOutlet="itemRow; context: { $implicit: item }"
+                      ></ng-container>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          } @empty {
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Nenhum item foi extraído desta reunião. Você pode adicionar um na linha do tempo.
+            </p>
+          }
+        </div>
+      } @else {
+        <!-- Linha do tempo: ordem cronológica, sincronizada com o player. -->
+        <div class="mt-6">
+          <h2 class="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Itens da reunião ({{ items().length }})
+          </h2>
+
+          <ul class="mt-3 flex flex-col gap-2">
+            @for (item of items(); track item.id) {
+              <li
+                class="rounded-lg border px-3 py-2 transition-colors duration-300"
+                [class.border-emerald-400]="highlightedItemId() === item.id"
+                [class.bg-emerald-50]="highlightedItemId() === item.id"
+                [class.dark:bg-emerald-950]="highlightedItemId() === item.id"
+                [class.border-slate-200]="highlightedItemId() !== item.id"
+                [class.dark:border-slate-800]="highlightedItemId() !== item.id"
+              >
+                <ng-container
+                  *ngTemplateOutlet="itemRow; context: { $implicit: item }"
+                ></ng-container>
+              </li>
+            } @empty {
+              <li class="text-sm text-slate-500 dark:text-slate-400">
+                Nenhum item foi extraído desta reunião. Você pode adicionar um abaixo.
+              </li>
+            }
+          </ul>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <select
+              [ngModel]="newItemType()"
+              (ngModelChange)="newItemType.set($event)"
+              class="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            >
+              @for (type of typeOptions; track type) {
+                <option [value]="type">{{ typeLabels[type] }}</option>
+              }
+            </select>
+            <input
+              type="text"
+              placeholder="Adicionar um item que faltou"
+              [ngModel]="newItemContent()"
+              (ngModelChange)="newItemContent.set($event)"
+              class="min-w-48 flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <p-button label="Adicionar" size="small" icon="pi pi-plus" (onClick)="addItem()" />
+          </div>
+        </div>
+      }
+
+      @if (approveError(); as message) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+      @if (sendError(); as message) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ message }}</p>
+      }
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <p-button
+          [label]="approving() ? 'Salvando...' : (summary()?.approved ? 'Salvar alterações' : 'Aprovar e salvar')"
+          icon="pi pi-check"
+          [disabled]="!canApprove()"
+          [loading]="approving()"
+          (onClick)="approveAndSave()"
+        />
+        @if (summary()?.approved) {
+          <p-button
+            [label]="alreadySentToCrm() ? 'Enviado ao CRM' : (sendingToCrm() ? 'Enviando...' : 'Enviar ao CRM')"
+            icon="pi pi-send"
+            severity="success"
+            [disabled]="alreadySentToCrm() || sendingToCrm()"
+            [loading]="sendingToCrm()"
+            (onClick)="sendToCrm()"
+          />
+        }
+      </div>
+    }
+  }
+</div>
+
+<!-- Linha de item compartilhada pelas duas abas: mesma edição, mesmos controles. -->
+<ng-template #itemRow let-item>
+  <div class="flex items-center gap-2">
+    <span
+      class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+    >
+      {{ typeLabel(item) }}
+    </span>
+    @if (item.priority === 'alta') {
+      <i class="pi pi-star-fill text-xs text-amber-500" title="Item em destaque"></i>
+    }
+    <button
+      type="button"
+      class="text-xs text-emerald-700 hover:underline disabled:cursor-default disabled:text-slate-400 disabled:no-underline dark:text-emerald-400"
+      [disabled]="item.timestampSeconds === null || audioExpired()"
+      (click)="seekTo(item)"
+    >
+      <i class="pi pi-play-circle text-xs"></i>
+      {{ formatTimestamp(item.timestampSeconds) }}
+    </button>
+
+    <span class="ml-auto flex gap-2">
+      @if (canHavePriority(item)) {
+        <button
+          type="button"
+          class="text-xs text-amber-700 hover:underline dark:text-amber-400"
+          (click)="togglePriority(item)"
+        >
+          {{ item.priority === 'alta' ? 'Tirar destaque' : 'Destacar' }}
+        </button>
+      }
+      @if (editingItemId() !== item.id) {
+        <button
+          type="button"
+          class="text-xs text-slate-500 hover:underline dark:text-slate-400"
+          (click)="startEditingItem(item)"
+        >
+          Editar
+        </button>
+      }
+      <button
+        type="button"
+        class="text-xs text-red-600 hover:underline dark:text-red-400"
+        (click)="removeItem(item.id)"
+      >
+        Remover
+      </button>
+    </span>
+  </div>
+
+  @if (editingItemId() === item.id) {
+    <input
+      type="text"
+      [ngModel]="itemDraft()"
+      (ngModelChange)="itemDraft.set($event)"
+      class="mt-2 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+    />
+    <div class="mt-2 flex gap-2">
+      <p-button label="Salvar" size="small" (onClick)="saveItem(item.id)" />
+      <p-button label="Cancelar" size="small" severity="secondary" (onClick)="cancelEditingItem()" />
+    </div>
+  } @else {
+    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ item.content }}</p>
+  }
+</ng-template>

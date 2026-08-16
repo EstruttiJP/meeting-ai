@@ -49,7 +49,7 @@ class MeetingPipelineStepsTest {
 	void setUp() {
 		steps = new MeetingPipelineSteps(meetingRepository, transcriptionRepository, summaryRepository, JsonMapper.builder().build());
 		User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3");
+		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3", MeetingType.GENERICA);
 		meetingId = UUID.randomUUID();
 	}
 
@@ -70,7 +70,7 @@ class MeetingPipelineStepsTest {
 	void saveTranscriptionAndMarkSummarizingPersistsTranscriptionAndUpdatesStatus() {
 		when(meetingRepository.getReferenceById(meetingId)).thenReturn(meeting);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
-		TranscriptionResult result = new TranscriptionResult("transcrição completa", "pt");
+		TranscriptionResult result = new TranscriptionResult("transcrição completa", "pt", List.of());
 
 		steps.saveTranscriptionAndMarkSummarizing(meetingId, result, "whisper-local");
 
@@ -83,7 +83,7 @@ class MeetingPipelineStepsTest {
 	void saveSummaryAndMarkReadyPersistsSummaryJsonAndMarksReady() {
 		when(meetingRepository.getReferenceById(meetingId)).thenReturn(meeting);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
-		SummaryContent content = new SummaryContent("resumo objetivo", List.of("decisão 1"), List.of(), List.of(), null, List.of());
+		SummaryContent content = new SummaryContent("resumo objetivo", List.of());
 
 		steps.saveSummaryAndMarkReady(meetingId, content);
 
@@ -92,12 +92,14 @@ class MeetingPipelineStepsTest {
 	}
 
 	@Test
-	void markFailedUpdatesStatusWhenMeetingExists() {
+	void markFailedPersistsCategoryAndTechnicalReason() {
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
 
-		steps.markFailed(meetingId);
+		steps.markFailed(meetingId, MeetingFailureCategory.TRANSCRIPTION, "422 audio_file: Field required");
 
 		assertThat(meeting.getStatus()).isEqualTo(MeetingStatus.FAILED);
+		assertThat(meeting.getFailureCategory()).isEqualTo(MeetingFailureCategory.TRANSCRIPTION);
+		assertThat(meeting.getFailureReason()).isEqualTo("422 audio_file: Field required");
 		verify(meetingRepository).save(meeting);
 	}
 
@@ -105,7 +107,7 @@ class MeetingPipelineStepsTest {
 	void markFailedDoesNothingWhenMeetingIsMissing() {
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.empty());
 
-		steps.markFailed(meetingId);
+		steps.markFailed(meetingId, MeetingFailureCategory.UNKNOWN, "erro qualquer");
 
 		verify(meetingRepository, never()).save(any());
 	}
