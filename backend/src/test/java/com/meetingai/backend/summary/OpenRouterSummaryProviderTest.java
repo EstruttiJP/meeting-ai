@@ -131,6 +131,29 @@ class OpenRouterSummaryProviderTest {
 	}
 
 	@Test
+	void keepsPriorityOnDecisionsAndNextStepsOnly() {
+		mockServer.expect(requestTo(containsString("/chat/completions")))
+				.andRespond(withSuccess(chatResponse("""
+						{"summary": "Resumo", "items": [
+						  {"type": "decisao", "content": "Crítica", "timestampSeconds": 30, "priority": "alta"},
+						  {"type": "proximo_passo", "content": "Comum", "timestampSeconds": 0},
+						  {"type": "valor_mencionado", "content": "R$ 10", "timestampSeconds": 0, "priority": "alta"}
+						]}
+						"""), MediaType.APPLICATION_JSON));
+
+		SummaryContent content = provider.summarize(TRANSCRIPTION);
+
+		assertThat(content.itemsOfType(SummaryItemType.DECISAO)).singleElement()
+				.satisfies(i -> assertThat(i.priority()).isEqualTo(SummaryItemPriority.ALTA));
+		// Ausente vira normal, para o "é destaque?" não ter nulo no meio.
+		assertThat(content.itemsOfType(SummaryItemType.PROXIMO_PASSO)).singleElement()
+				.satisfies(i -> assertThat(i.priority()).isEqualTo(SummaryItemPriority.NORMAL));
+		// O modelo mandou prioridade num tipo que não tem: descartada.
+		assertThat(content.itemsOfType(SummaryItemType.VALOR_MENCIONADO)).singleElement()
+				.satisfies(i -> assertThat(i.priority()).isNull());
+	}
+
+	@Test
 	void parsesResponseWrappedInMarkdownFence() {
 		String fenced = "```json\n{\"summary\": \"Resumo\", \"items\": []}\n```";
 		mockServer.expect(requestTo(containsString("/chat/completions")))

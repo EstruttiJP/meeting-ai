@@ -17,6 +17,7 @@ import com.meetingai.backend.meeting.UnsupportedMeetingFormatException;
 import com.meetingai.backend.summary.SummaryNotApprovedException;
 import com.meetingai.backend.meeting.MeetingAudioUnavailableException;
 import com.meetingai.backend.summary.SummaryItemNotFoundException;
+import com.meetingai.backend.summary.SummaryItemUpdateException;
 import com.meetingai.backend.summary.SummaryNotFoundException;
 import com.meetingai.backend.transcription.TranscriptionNotFoundException;
 import com.meetingai.backend.usagequota.UsageQuotaExceededException;
@@ -63,6 +64,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(SummaryItemNotFoundException.class)
 	public ProblemDetail handleSummaryItemNotFound(SummaryItemNotFoundException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler(SummaryItemUpdateException.class)
+	public ProblemDetail handleSummaryItemUpdate(SummaryItemUpdateException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 	@ExceptionHandler(MeetingAudioUnavailableException.class)

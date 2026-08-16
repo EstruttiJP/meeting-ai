@@ -67,9 +67,9 @@ public class SummaryController {
 
 	@PatchMapping("/items/{itemId}")
 	public ResponseEntity<SummaryResponse> updateItem(@PathVariable UUID meetingId, @PathVariable String itemId,
-			@Valid @RequestBody SummaryItemUpdateRequest request) {
+			@RequestBody SummaryItemUpdateRequest request) {
 		User user = currentUserService.getCurrentUser();
-		return ResponseEntity.ok(summaryService.updateItem(user, meetingId, itemId, request.content()));
+		return ResponseEntity.ok(summaryService.updateItem(user, meetingId, itemId, request));
 	}
 
 	@DeleteMapping("/items/{itemId}")

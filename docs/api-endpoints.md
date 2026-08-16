@@ -63,7 +63,7 @@ sempre retorna `400`, nunca chega ao controller.
 | PUT    | `/api/meetings/{id}/summary`                  | Edição do resumo pelo usuário — é a própria revisão humana, aprova ao salvar | Não existe endpoint de "aprovar" separado; PUT edita e aprova numa tacada só |
 | PATCH  | `/api/meetings/{id}/summary`                  | Edita só o texto corrido do resumo, sem tocar nos itens | Não aprova |
 | POST   | `/api/meetings/{id}/summary/items`            | Adiciona um item à mão (`type`, `content`, `timestampSeconds`) | O `id` é gerado no servidor, para não colidir com os ids vindos do modelo |
-| PATCH  | `/api/meetings/{id}/summary/items/{itemId}`   | Corrige o texto de um item | Tipo e timestamp não mudam: o timestamp está ancorado num trecho real do áudio |
+| PATCH  | `/api/meetings/{id}/summary/items/{itemId}`   | Corrige o texto (`content`) e/ou a prioridade (`priority`) de um item | Campos independentes e opcionais; ausente significa "não mexe". Tipo e timestamp não mudam: o timestamp está ancorado num trecho real do áudio. `400` se nada for informado, se o texto vier vazio, ou se vier prioridade num tipo que não tem |
 | DELETE | `/api/meetings/{id}/summary/items/{itemId}`   | Remove um item | `404` se o item não existir (tela desatualizada) |
 | POST   | `/api/meetings/{id}/summary/send-to-crm`      | Envia o resumo aprovado para o CRM (cria negócio + nota no Pipedrive) | `409` se o resumo não estiver aprovado; `400` se não houver CRM conectado; nunca dispara sozinho, só a partir desta chamada explícita |
 
@@ -73,6 +73,12 @@ tipados (`items`), cada um com `id`, `type` (`decisao`, `proximo_passo`,
 gravação em que aquilo foi dito, sempre ancorado num segmento real da
 transcrição, ou `null` quando não foi possível ancorar. Os endpoints por item
 existem para que corrigir uma decisão não reescreva o resumo inteiro junto.
+
+Decisão e próximo passo carregam também `priority` (`alta` ou `normal`), que
+alimenta o card de destaque da aba Resumo. Nos outros dois tipos o campo é
+sempre `null`: prioridade ali confundiria criticidade com magnitude do valor.
+O modelo é instruído a marcar no máximo um ou dois itens como `alta`, e a
+usuária pode promover ou rebaixar qualquer item pelo PATCH.
 
 ## Pipeline assíncrono
 

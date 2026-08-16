@@ -107,10 +107,10 @@ class SummaryServiceTest {
 
 	@Test
 	void updateItemChangesOnlyTheTargetItemAndKeepsItsTimestamp() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 		givenSavePersists();
 
-		SummaryResponse response = summaryService.updateItem(user, meetingId, "item-2", "Decisão corrigida");
+		SummaryResponse response = summaryService.updateItem(user, meetingId, "item-2", new SummaryItemUpdateRequest("Decisão corrigida", null));
 
 		assertThat(response.content().items()).satisfiesExactly(
 				first -> assertThat(first.content()).isEqualTo("Primeiro item"),
@@ -119,29 +119,30 @@ class SummaryServiceTest {
 					// timestamp preservado: continua apontando pro mesmo ponto do áudio
 					assertThat(second.timestampSeconds()).isEqualTo(30.0);
 					assertThat(second.type()).isEqualTo(SummaryItemType.DECISAO);
-				});
+				},
+				third -> assertThat(third.content()).isEqualTo("R$ 500"));
 	}
 
 	@Test
 	void removeItemDropsOnlyThatItem() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 		givenSavePersists();
 
 		SummaryResponse response = summaryService.removeItem(user, meetingId, "item-1");
 
-		assertThat(response.content().items()).singleElement()
-				.satisfies(item -> assertThat(item.id()).isEqualTo("item-2"));
+		assertThat(response.content().items()).map(SummaryItem::id)
+				.containsExactly("item-2", "item-3");
 	}
 
 	@Test
 	void addItemGeneratesAnIdThatDoesNotCollideWithExistingOnes() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 		givenSavePersists();
 
 		SummaryResponse response = summaryService.addItem(user, meetingId,
 				new SummaryItemCreateRequest(SummaryItemType.PONTO_ATENCAO, "Anotado à mão", 12.0));
 
-		assertThat(response.content().items()).hasSize(3);
+		assertThat(response.content().items()).hasSize(4);
 		assertThat(response.content().items()).map(SummaryItem::id).doesNotHaveDuplicates();
 		assertThat(response.content().itemsOfType(SummaryItemType.PONTO_ATENCAO))
 				.singleElement()
@@ -150,7 +151,7 @@ class SummaryServiceTest {
 
 	@Test
 	void editingItemsDoesNotTouchTheSummaryText() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 		givenSavePersists();
 
 		SummaryResponse response = summaryService.removeItem(user, meetingId, "item-1");
@@ -159,16 +160,114 @@ class SummaryServiceTest {
 	}
 
 	@Test
-	void updateItemThrowsWhenItemDoesNotExist() {
-		givenSummaryWithTwoItems();
+	void promotesAnItemToHighPriorityWithoutTouchingItsText() {
+		givenSummaryWithItems();
+		givenSavePersists();
 
-		assertThatThrownBy(() -> summaryService.updateItem(user, meetingId, "nao-existe", "x"))
+		SummaryResponse response = summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest(null, SummaryItemPriority.ALTA));
+
+		SummaryItem alterado = response.content().items().stream()
+				.filter(i -> i.id().equals("item-2")).findFirst().orElseThrow();
+		assertThat(alterado.priority()).isEqualTo(SummaryItemPriority.ALTA);
+		assertThat(alterado.content()).isEqualTo("Segundo item");
+	}
+
+	@Test
+	void demotesAnItemBackToNormal() {
+		givenSummaryWithItems();
+		givenSavePersists();
+
+		summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest(null, SummaryItemPriority.ALTA));
+		SummaryResponse response = summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest(null, SummaryItemPriority.NORMAL));
+
+		assertThat(response.content().items().stream()
+				.filter(i -> i.id().equals("item-2")).findFirst().orElseThrow().priority())
+				.isEqualTo(SummaryItemPriority.NORMAL);
+	}
+
+	@Test
+	void editingOnlyTheTextKeepsThePriorityAsItWas() {
+		givenSummaryWithItems();
+		givenSavePersists();
+
+		summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest(null, SummaryItemPriority.ALTA));
+		SummaryResponse response = summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest("Texto novo", null));
+
+		SummaryItem alterado = response.content().items().stream()
+				.filter(i -> i.id().equals("item-2")).findFirst().orElseThrow();
+		assertThat(alterado.content()).isEqualTo("Texto novo");
+		assertThat(alterado.priority()).isEqualTo(SummaryItemPriority.ALTA);
+	}
+
+	@Test
+	void refusesPriorityOnATypeThatDoesNotHaveOne() {
+		givenSummaryWithItems();
+
+		// item-3 é um valor_mencionado: não disputa o card de destaque.
+		assertThatThrownBy(() -> summaryService.updateItem(user, meetingId, "item-3",
+				new SummaryItemUpdateRequest(null, SummaryItemPriority.ALTA)))
+				.isInstanceOf(SummaryItemUpdateException.class);
+	}
+
+	@Test
+	void refusesAnUpdateThatChangesNothing() {
+		// Validado antes de tocar no banco, então nem precisa de resumo carregado.
+		assertThatThrownBy(() -> summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest(null, null)))
+				.isInstanceOf(SummaryItemUpdateException.class);
+	}
+
+	@Test
+	void refusesToBlankOutAnItem() {
+		assertThatThrownBy(() -> summaryService.updateItem(user, meetingId, "item-2",
+				new SummaryItemUpdateRequest("   ", null)))
+				.isInstanceOf(SummaryItemUpdateException.class);
+	}
+
+	@Test
+	void manuallyAddedDecisionStartsAsNormalPriority() {
+		givenSummaryWithItems();
+		givenSavePersists();
+
+		SummaryResponse response = summaryService.addItem(user, meetingId,
+				new SummaryItemCreateRequest(SummaryItemType.DECISAO, "Anotado à mão", 12.0));
+
+		assertThat(response.content().itemsOfType(SummaryItemType.DECISAO))
+				.filteredOn(i -> i.content().equals("Anotado à mão"))
+				.singleElement()
+				.satisfies(i -> assertThat(i.priority()).isEqualTo(SummaryItemPriority.NORMAL));
+	}
+
+	@Test
+	void manuallyAddedValueHasNoPriorityAtAll() {
+		givenSummaryWithItems();
+		givenSavePersists();
+
+		SummaryResponse response = summaryService.addItem(user, meetingId,
+				new SummaryItemCreateRequest(SummaryItemType.VALOR_MENCIONADO, "R$ 10.000", 12.0));
+
+		assertThat(response.content().itemsOfType(SummaryItemType.VALOR_MENCIONADO))
+				.filteredOn(i -> i.content().equals("R$ 10.000"))
+				.singleElement()
+				.satisfies(i -> assertThat(i.priority()).isNull());
+	}
+
+	@Test
+	void updateItemThrowsWhenItemDoesNotExist() {
+		givenSummaryWithItems();
+
+		assertThatThrownBy(() -> summaryService.updateItem(user, meetingId, "nao-existe", new SummaryItemUpdateRequest("x", null)))
 				.isInstanceOf(SummaryItemNotFoundException.class);
 	}
 
 	@Test
 	void removeItemThrowsWhenItemDoesNotExist() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 
 		assertThatThrownBy(() -> summaryService.removeItem(user, meetingId, "nao-existe"))
 				.isInstanceOf(SummaryItemNotFoundException.class);
@@ -176,20 +275,21 @@ class SummaryServiceTest {
 
 	@Test
 	void updateSummaryTextKeepsTheItemsUntouched() {
-		givenSummaryWithTwoItems();
+		givenSummaryWithItems();
 		givenSavePersists();
 
 		SummaryResponse response = summaryService.updateSummaryText(user, meetingId, "resumo reescrito");
 
 		assertThat(response.content().summary()).isEqualTo("resumo reescrito");
-		assertThat(response.content().items()).hasSize(2);
+		assertThat(response.content().items()).hasSize(3);
 	}
 
-	private Summary givenSummaryWithTwoItems() {
+	private Summary givenSummaryWithItems() {
 		String json = """
 				{"summary":"resumo original","items":[
-				  {"id":"item-1","type":"proximo_passo","content":"Primeiro item","timestampSeconds":10.0},
-				  {"id":"item-2","type":"decisao","content":"Segundo item","timestampSeconds":30.0}
+				  {"id":"item-1","type":"proximo_passo","content":"Primeiro item","timestampSeconds":10.0,"priority":"normal"},
+				  {"id":"item-2","type":"decisao","content":"Segundo item","timestampSeconds":30.0,"priority":"normal"},
+				  {"id":"item-3","type":"valor_mencionado","content":"R$ 500","timestampSeconds":50.0}
 				]}
 				""";
 		Summary summary = new Summary(meeting, json);

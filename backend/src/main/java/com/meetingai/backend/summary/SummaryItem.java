@@ -13,10 +13,19 @@ import jakarta.validation.constraints.PositiveOrZero;
  * <p>{@code timestampSeconds} é nulo quando não foi possível ancorar o item
  * num segmento real do transcript. Preferimos assumir a ausência a inventar um
  * tempo que mandaria o player para o lugar errado.
+ *
+ * <p>{@code priority} só é preenchida em decisão e próximo passo; nos demais
+ * tipos é sempre nula.
  */
 public record SummaryItem(
 		@NotBlank String id,
 		@NotNull SummaryItemType type,
 		@NotBlank String content,
-		@PositiveOrZero Double timestampSeconds) {
+		@PositiveOrZero Double timestampSeconds,
+		SummaryItemPriority priority) {
+
+	/** Só decisão e próximo passo disputam o card de destaque da aba Resumo. */
+	public boolean canBeHighlighted() {
+		return type == SummaryItemType.DECISAO || type == SummaryItemType.PROXIMO_PASSO;
+	}
 }

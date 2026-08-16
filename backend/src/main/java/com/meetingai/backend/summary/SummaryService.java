@@ -64,25 +64,50 @@ public class SummaryService {
 	public SummaryResponse addItem(User user, UUID meetingId, SummaryItemCreateRequest request) {
 		return mutate(user, meetingId, content -> {
 			List<SummaryItem> items = new ArrayList<>(content.items());
-			items.add(new SummaryItem(nextItemId(content), request.type(), request.content(),
-					request.timestampSeconds()));
+			// Item anotado à mão entra como normal; quem quiser destacá-lo usa o
+			// PATCH de prioridade, como faria com um item vindo do modelo.
+			SummaryItem novo = new SummaryItem(nextItemId(content), request.type(), request.content(),
+					request.timestampSeconds(), null);
+			items.add(novo.canBeHighlighted()
+					? new SummaryItem(novo.id(), novo.type(), novo.content(), novo.timestampSeconds(),
+							SummaryItemPriority.NORMAL)
+					: novo);
 			return new SummaryContent(content.summary(), items);
 		});
 	}
 
 	@Transactional
-	public SummaryResponse updateItem(User user, UUID meetingId, String itemId, String newContent) {
+	public SummaryResponse updateItem(User user, UUID meetingId, String itemId, SummaryItemUpdateRequest request) {
+		if (request.isEmpty()) {
+			throw new SummaryItemUpdateException("Informe ao menos um campo para alterar no item.");
+		}
+		if (request.content() != null && request.content().isBlank()) {
+			throw new SummaryItemUpdateException("O conteúdo do item não pode ficar vazio.");
+		}
 		return mutate(user, meetingId, content -> {
-			if (content.items().stream().noneMatch(item -> item.id().equals(itemId))) {
-				throw new SummaryItemNotFoundException(itemId);
+			SummaryItem target = content.items().stream()
+					.filter(item -> item.id().equals(itemId))
+					.findFirst()
+					.orElseThrow(() -> new SummaryItemNotFoundException(itemId));
+			if (request.priority() != null && !target.canBeHighlighted()) {
+				throw new SummaryItemUpdateException(
+						"Só decisão e próximo passo têm prioridade.");
 			}
 			List<SummaryItem> items = content.items().stream()
-					.map(item -> item.id().equals(itemId)
-							? new SummaryItem(item.id(), item.type(), newContent, item.timestampSeconds())
-							: item)
+					.map(item -> item.id().equals(itemId) ? applyTo(item, request) : item)
 					.toList();
 			return new SummaryContent(content.summary(), items);
 		});
+	}
+
+	/** Campo nulo no request significa "não mexe", não "apaga". */
+	private static SummaryItem applyTo(SummaryItem item, SummaryItemUpdateRequest request) {
+		return new SummaryItem(
+				item.id(),
+				item.type(),
+				request.content() == null ? item.content() : request.content(),
+				item.timestampSeconds(),
+				request.priority() == null ? item.priority() : request.priority());
 	}
 
 	@Transactional

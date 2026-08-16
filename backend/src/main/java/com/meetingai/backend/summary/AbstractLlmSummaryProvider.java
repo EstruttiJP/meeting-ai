@@ -33,8 +33,8 @@ abstract class AbstractLlmSummaryProvider {
 			{
 			  "summary": "resumo objetivo da reunião em um parágrafo",
 			  "items": [
-			    {"type": "decisao", "content": "o que foi decidido", "timestampSeconds": 12},
-			    {"type": "proximo_passo", "content": "o que ficou combinado fazer", "timestampSeconds": 45},
+			    {"type": "decisao", "content": "o que foi decidido", "timestampSeconds": 12, "priority": "alta"},
+			    {"type": "proximo_passo", "content": "o que ficou combinado fazer", "timestampSeconds": 45, "priority": "normal"},
 			    {"type": "valor_mencionado", "content": "número, prazo ou valor citado", "timestampSeconds": 60},
 			    {"type": "ponto_atencao", "content": "risco, dúvida ou objeção levantada", "timestampSeconds": 90}
 			  ]
@@ -44,6 +44,12 @@ abstract class AbstractLlmSummaryProvider {
 			ponto_atencao. O campo "summary" é obrigatório e nunca pode ficar vazio. Se a reunião não tiver \
 			nenhum item de um tipo, simplesmente não inclua itens daquele tipo — não invente conteúdo para \
 			preencher.
+
+			O campo "priority" ("alta" ou "normal") vale SOMENTE para decisao e proximo_passo; não inclua \
+			esse campo nos outros dois tipos. Marque como "alta" apenas o que for realmente crítico ou \
+			urgente para o andamento do trabalho — no máximo um ou dois itens da reunião inteira. Se nada \
+			se destacar de verdade, marque tudo como "normal": é melhor não ter destaque do que eleger um \
+			item qualquer.
 
 			Cada linha da transcrição começa com o tempo em que ela foi dita, no formato [MM:SS]. Para cada \
 			item extraído, "timestampSeconds" deve ser o tempo EM SEGUNDOS da linha onde aquilo foi dito — \
@@ -130,9 +136,22 @@ abstract class AbstractLlmSummaryProvider {
 				id = "item-" + nextGeneratedId;
 			}
 			normalized.add(new SummaryItem(id, item.type(), item.content(),
-					anchorToSegment(item.timestampSeconds(), segments)));
+					anchorToSegment(item.timestampSeconds(), segments),
+					normalizePriority(item)));
 		}
 		return new SummaryContent(content.summary(), normalized);
+	}
+
+	/**
+	 * Prioridade só sobrevive em decisão e próximo passo — nos outros tipos ela é
+	 * descartada mesmo que o modelo tenha mandado. Ausente vira NORMAL, para o
+	 * "é destaque?" ser sempre uma comparação simples, sem nulo no meio.
+	 */
+	private static SummaryItemPriority normalizePriority(SummaryItem item) {
+		if (!item.canBeHighlighted()) {
+			return null;
+		}
+		return item.priority() == null ? SummaryItemPriority.NORMAL : item.priority();
 	}
 
 	/**
