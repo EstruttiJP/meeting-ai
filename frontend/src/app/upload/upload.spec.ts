@@ -91,7 +91,9 @@ describe('Upload', () => {
   });
 
   it('uploads the meeting and navigates to its progress screen', () => {
-    const navigateSpy = vi.spyOn(router, 'navigate');
+    // mockResolvedValue e não spy puro: o TestBed registra provideRouter([]),
+    // então uma navegação real rejeitaria com NG04002 e derrubaria a suíte.
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const instance = fixture.componentInstance;
 
     instance['meetingType'].set('DAILY');
@@ -126,6 +128,7 @@ describe('Upload', () => {
 
   it('sends the chosen meeting type along with the file', () => {
     const instance = fixture.componentInstance;
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const uploadSpy = vi.spyOn(meetingsServiceMock, 'upload');
 
     instance['meetingType'].set('FECHAMENTO');
