@@ -11,7 +11,7 @@ describe('SummaryService', () => {
 
   const CONTENT: SummaryContent = {
     summary: 'Resumo',
-    items: [{ id: 'item-1', type: 'decisao', content: 'Decisão', timestampSeconds: 12 }],
+    items: [{ id: 'item-1', type: 'decisao', content: 'Decisão', timestampSeconds: 12, priority: 'normal' }],
   };
 
   const SUMMARY: Summary = {
@@ -76,11 +76,20 @@ describe('SummaryService', () => {
   });
 
   it('updateItem() patches a single item by id', () => {
-    service.updateItem('m1', 'item-1', 'Corrigido').subscribe();
+    service.updateItem('m1', 'item-1', { content: 'Corrigido' }).subscribe();
 
     const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary/items/item-1');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ content: 'Corrigido' });
+    req.flush(SUMMARY);
+  });
+
+  it('updateItem() can patch only the priority, leaving the text alone', () => {
+    service.updateItem('m1', 'item-1', { priority: 'alta' }).subscribe();
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary/items/item-1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ priority: 'alta' });
     req.flush(SUMMARY);
   });
 

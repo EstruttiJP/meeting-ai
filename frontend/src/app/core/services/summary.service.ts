@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { Summary, SummaryContent, SummaryItemType } from '../models/summary.model';
+import { Summary, SummaryContent, SummaryItemPriority, SummaryItemType } from '../models/summary.model';
 
 @Injectable({ providedIn: 'root' })
 export class SummaryService {
@@ -35,8 +35,13 @@ export class SummaryService {
     return this.http.post<Summary>(`${this.summaryUrl(meetingId)}/items`, item);
   }
 
-  updateItem(meetingId: string, itemId: string, content: string): Observable<Summary> {
-    return this.http.patch<Summary>(`${this.summaryUrl(meetingId)}/items/${itemId}`, { content });
+  // content e priority são independentes: omitir um significa "não mexe nele".
+  updateItem(
+    meetingId: string,
+    itemId: string,
+    changes: { content?: string; priority?: SummaryItemPriority },
+  ): Observable<Summary> {
+    return this.http.patch<Summary>(`${this.summaryUrl(meetingId)}/items/${itemId}`, changes);
   }
 
   removeItem(meetingId: string, itemId: string): Observable<Summary> {

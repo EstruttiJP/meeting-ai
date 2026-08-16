@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -7,9 +7,12 @@ import { Button } from 'primeng/button';
 import { toAppError } from '../core/http/to-app-error';
 import { Meeting } from '../core/models/meeting.model';
 import {
+  SUMMARY_GROUP_ORDER,
+  SUMMARY_ITEM_GROUP_LABEL,
   SUMMARY_ITEM_TYPE_LABEL,
   Summary,
   SummaryItem,
+  SummaryItemPriority,
   SummaryItemType,
 } from '../core/models/summary.model';
 import { MeetingsService } from '../core/services/meetings.service';
@@ -24,9 +27,18 @@ import { LoadingState } from '../shared/ui/loading-state/loading-state';
  */
 const HIGHLIGHT_WINDOW_SECONDS = 6;
 
+export type ReviewTab = 'resumo' | 'linha-do-tempo';
+
+/** Um grupo da aba Resumo: um tipo de item com seus itens e o estado de colapso. */
+export interface ItemGroup {
+  type: SummaryItemType;
+  label: string;
+  items: SummaryItem[];
+}
+
 @Component({
   selector: 'app-review',
-  imports: [FormsModule, Button, DatePipe, LoadingState, ErrorState],
+  imports: [FormsModule, Button, DatePipe, NgTemplateOutlet, LoadingState, ErrorState],
   templateUrl: './review.html',
   styleUrl: './review.css',
 })
@@ -79,6 +91,29 @@ export class Review implements OnInit {
     [...(this.content()?.items ?? [])].sort(
       (a, b) => (a.timestampSeconds ?? Infinity) - (b.timestampSeconds ?? Infinity),
     ),
+  );
+
+  /** A aba Resumo abre primeiro: quem chega quer ver o que importa, não a ordem de menção. */
+  protected readonly activeTab = signal<ReviewTab>('resumo');
+
+  /** Grupos começam fechados; abrir é escolha de quem quer o detalhe. */
+  private readonly expandedGroups = signal<ReadonlySet<SummaryItemType>>(new Set());
+
+  protected readonly groups = computed<ItemGroup[]>(() =>
+    SUMMARY_GROUP_ORDER.map((type) => ({
+      type,
+      label: SUMMARY_ITEM_GROUP_LABEL[type],
+      items: this.items().filter((item) => item.type === type),
+    })).filter((group) => group.items.length > 0),
+  );
+
+  /**
+   * Item de destaque: o mais crítico da reunião. Só existe quando algo foi
+   * marcado como prioridade alta — por decisão do modelo ou da própria usuária.
+   * Sem isso o card some, em vez de eleger um item qualquer.
+   */
+  protected readonly highlightItem = computed<SummaryItem | null>(
+    () => this.items().find((item) => item.priority === 'alta') ?? null,
   );
 
   protected readonly alreadySentToCrm = computed(() => this.meeting()?.status === 'SENT_TO_CRM');
@@ -204,13 +239,52 @@ export class Review implements OnInit {
     if (!text.trim()) {
       return;
     }
-    this.summaryService.updateItem(this.id(), itemId, text).subscribe({
+    this.summaryService.updateItem(this.id(), itemId, { content: text }).subscribe({
       next: (summary) => {
         this.summary.set(summary);
         this.cancelEditingItem();
       },
       error: (error) => this.itemError.set(toAppError(error).message),
     });
+  }
+
+  protected isGroupExpanded(type: SummaryItemType): boolean {
+    return this.expandedGroups().has(type);
+  }
+
+  protected toggleGroup(type: SummaryItemType) {
+    const next = new Set(this.expandedGroups());
+    if (!next.delete(type)) {
+      next.add(type);
+    }
+    this.expandedGroups.set(next);
+  }
+
+  /**
+   * Promove ou rebaixa um item no card de destaque. Só decisão e próximo passo
+   * têm prioridade — o botão nem aparece nos outros tipos.
+   */
+  protected togglePriority(item: SummaryItem) {
+    const priority: SummaryItemPriority = item.priority === 'alta' ? 'normal' : 'alta';
+    this.summaryService.updateItem(this.id(), item.id, { priority }).subscribe({
+      next: (summary) => this.summary.set(summary),
+      error: (error) => this.itemError.set(toAppError(error).message),
+    });
+  }
+
+  /** O contexto do ng-template chega como any, então o acesso ao rótulo passa por aqui. */
+  protected typeLabel(item: SummaryItem): string {
+    return SUMMARY_ITEM_TYPE_LABEL[item.type];
+  }
+
+  protected canHavePriority(item: SummaryItem): boolean {
+    return item.type === 'decisao' || item.type === 'proximo_passo';
+  }
+
+  /** Leva para a linha do tempo já no ponto do item, a partir do card de destaque. */
+  protected openInTimeline(item: SummaryItem) {
+    this.activeTab.set('linha-do-tempo');
+    this.seekTo(item);
   }
 
   protected removeItem(itemId: string) {
