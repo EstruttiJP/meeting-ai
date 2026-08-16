@@ -44,7 +44,8 @@ class MeetingPipelineSteps {
 		Meeting meeting = getMeetingOrThrow(meetingId);
 		meeting.markTranscribing();
 		meetingRepository.save(meeting);
-		return new PipelineContext(meeting.getStorageKey(), meeting.getOriginalFilename(), meeting.getUser().getId());
+		return new PipelineContext(meeting.getStorageKey(), meeting.getOriginalFilename(),
+				meeting.getUser().getId(), meeting.getMeetingType());
 	}
 
 	@Transactional
@@ -82,7 +83,7 @@ class MeetingPipelineSteps {
 				.orElseThrow(() -> new IllegalStateException("Meeting não encontrada: " + meetingId));
 	}
 
-	record PipelineContext(String storageKey, String originalFilename, UUID userId) {
+	record PipelineContext(String storageKey, String originalFilename, UUID userId, MeetingType meetingType) {
 	}
 
 }

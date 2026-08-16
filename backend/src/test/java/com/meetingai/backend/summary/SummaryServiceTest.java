@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.meetingai.backend.meeting.Meeting;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.meeting.MeetingNotFoundException;
 import com.meetingai.backend.meeting.MeetingRepository;
 import com.meetingai.backend.user.User;
@@ -42,7 +43,7 @@ class SummaryServiceTest {
 		summaryService = new SummaryService(summaryRepository, meetingRepository, JsonMapper.builder().build());
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 		ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
-		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		meetingId = UUID.randomUUID();
 		ReflectionTestUtils.setField(meeting, "id", meetingId);
 	}
@@ -72,7 +73,7 @@ class SummaryServiceTest {
 	void getForMeetingThrowsWhenMeetingBelongsToAnotherUser() {
 		User otherUser = new User("google-sub-2", "other@meetingai.com", "Other User", null);
 		ReflectionTestUtils.setField(otherUser, "id", UUID.randomUUID());
-		Meeting othersMeeting = new Meeting(otherUser, "Reunião de outro usuário", "r.mp3", "key.mp3");
+		Meeting othersMeeting = new Meeting(otherUser, "Reunião de outro usuário", "r.mp3", "key.mp3", MeetingType.GENERICA);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(othersMeeting));
 
 		assertThatThrownBy(() -> summaryService.getForMeeting(user, meetingId))
@@ -310,7 +311,7 @@ class SummaryServiceTest {
 	void approveThrowsWhenMeetingBelongsToAnotherUser() {
 		User otherUser = new User("google-sub-2", "other@meetingai.com", "Other User", null);
 		ReflectionTestUtils.setField(otherUser, "id", UUID.randomUUID());
-		Meeting othersMeeting = new Meeting(otherUser, "Reunião de outro usuário", "r.mp3", "key.mp3");
+		Meeting othersMeeting = new Meeting(otherUser, "Reunião de outro usuário", "r.mp3", "key.mp3", MeetingType.GENERICA);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(othersMeeting));
 		SummaryContent editedContent = new SummaryContent("resumo editado", List.of());
 

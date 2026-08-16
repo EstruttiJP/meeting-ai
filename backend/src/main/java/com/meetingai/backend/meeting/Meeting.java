@@ -43,6 +43,10 @@ public class Meeting {
 	@Column(nullable = false, length = 30)
 	private MeetingStatus status;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "meeting_type", nullable = false, length = 30)
+	private MeetingType meetingType;
+
 	@Column(name = "uploaded_at", nullable = false, updatable = false)
 	private Instant uploadedAt;
 
@@ -62,11 +66,12 @@ public class Meeting {
 	protected Meeting() {
 	}
 
-	public Meeting(User user, String title, String originalFilename, String storageKey) {
+	public Meeting(User user, String title, String originalFilename, String storageKey, MeetingType meetingType) {
 		this.user = user;
 		this.title = title;
 		this.originalFilename = originalFilename;
 		this.storageKey = storageKey;
+		this.meetingType = meetingType == null ? MeetingType.GENERICA : meetingType;
 		this.status = MeetingStatus.UPLOADED;
 	}
 
@@ -137,6 +142,10 @@ public class Meeting {
 
 	public MeetingStatus getStatus() {
 		return status;
+	}
+
+	public MeetingType getMeetingType() {
+		return meetingType;
 	}
 
 	public Instant getUploadedAt() {

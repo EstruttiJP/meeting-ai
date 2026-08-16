@@ -53,7 +53,7 @@ class MeetingUploadServiceTest {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
 		given(meetingRepository.save(any(Meeting.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-		Meeting meeting = meetingUploadService.upload(user, "Reunião de vendas", file);
+		Meeting meeting = meetingUploadService.upload(user, "Reunião de vendas", file, MeetingType.GENERICA);
 
 		assertThat(meeting.getStatus()).isEqualTo(MeetingStatus.UPLOADED);
 		assertThat(meeting.getOriginalFilename()).isEqualTo("reuniao.mp3");
@@ -66,10 +66,30 @@ class MeetingUploadServiceTest {
 	}
 
 	@Test
+	void persistsTheMeetingTypeChosenAtUpload() {
+		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
+		given(meetingRepository.save(any(Meeting.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+		Meeting meeting = meetingUploadService.upload(user, "Daily do time", file, MeetingType.DAILY);
+
+		assertThat(meeting.getMeetingType()).isEqualTo(MeetingType.DAILY);
+	}
+
+	@Test
+	void fallsBackToGenericWhenNoTypeIsGiven() {
+		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
+		given(meetingRepository.save(any(Meeting.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+		Meeting meeting = meetingUploadService.upload(user, "Sem tipo", file, null);
+
+		assertThat(meeting.getMeetingType()).isEqualTo(MeetingType.GENERICA);
+	}
+
+	@Test
 	void rejectsUnsupportedFormatBeforeCheckingQuotaOrStoring() {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.txt", "text/plain", "conteudo".getBytes());
 
-		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file))
+		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file, MeetingType.GENERICA))
 				.isInstanceOf(UnsupportedMeetingFormatException.class);
 		verifyNoInteractions(usageQuotaService, storageService);
 	}
@@ -79,7 +99,7 @@ class MeetingUploadServiceTest {
 		byte[] tooLarge = new byte[(int) (MAX_FILE_SIZE_MB * 1024 * 1024) + 1];
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", tooLarge);
 
-		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file))
+		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file, MeetingType.GENERICA))
 				.isInstanceOf(MeetingFileTooLargeException.class);
 		verifyNoInteractions(usageQuotaService, storageService);
 	}
@@ -89,7 +109,7 @@ class MeetingUploadServiceTest {
 		MockMultipartFile file = new MockMultipartFile("file", "reuniao.mp3", "audio/mpeg", "conteudo".getBytes());
 		willThrow(new UsageQuotaExceededException(10)).given(usageQuotaService).consumeUploadSlot(user);
 
-		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file))
+		assertThatThrownBy(() -> meetingUploadService.upload(user, "Reunião de vendas", file, MeetingType.GENERICA))
 				.isInstanceOf(UsageQuotaExceededException.class);
 		verify(storageService, never()).store(anyString(), any(), anyLong(), anyString());
 		verify(meetingRepository, never()).save(any());

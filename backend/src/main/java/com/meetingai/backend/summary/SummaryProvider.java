@@ -1,5 +1,6 @@
 package com.meetingai.backend.summary;
 
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 
 /**
@@ -9,6 +10,6 @@ import com.meetingai.backend.transcription.TranscriptionResult;
  */
 public interface SummaryProvider {
 
-	SummaryContent summarize(TranscriptionResult transcription);
+	SummaryContent summarize(TranscriptionResult transcription, MeetingType meetingType);
 
 }

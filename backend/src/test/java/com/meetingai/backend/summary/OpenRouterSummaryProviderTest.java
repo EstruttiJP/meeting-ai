@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.transcription.TranscriptionSegment;
 
@@ -59,7 +60,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRIPTION);
+		SummaryContent content = provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		assertThat(content.summary()).isEqualTo("Reunião de alinhamento");
 		assertThat(content.items()).hasSize(2);
@@ -79,7 +80,7 @@ class OpenRouterSummaryProviderTest {
 						{"summary": "Resumo", "items": []}
 						"""), MediaType.APPLICATION_JSON));
 
-		provider.summarize(TRANSCRIPTION);
+		provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		mockServer.verify();
 	}
@@ -93,7 +94,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRIPTION);
+		SummaryContent content = provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		// 5000 não existe na gravação; o item é ancorado no segmento mais próximo.
 		assertThat(content.items()).singleElement()
@@ -109,7 +110,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(new TranscriptionResult("texto", "pt", List.of()));
+		SummaryContent content = provider.summarize(new TranscriptionResult("texto", "pt", List.of()), MeetingType.GENERICA);
 
 		assertThat(content.items()).singleElement()
 				.satisfies(item -> assertThat(item.timestampSeconds()).isNull());
@@ -125,7 +126,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRIPTION);
+		SummaryContent content = provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		assertThat(content.items()).map(SummaryItem::id).doesNotHaveDuplicates();
 	}
@@ -141,7 +142,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRIPTION);
+		SummaryContent content = provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		assertThat(content.itemsOfType(SummaryItemType.DECISAO)).singleElement()
 				.satisfies(i -> assertThat(i.priority()).isEqualTo(SummaryItemPriority.ALTA));
@@ -154,12 +155,53 @@ class OpenRouterSummaryProviderTest {
 	}
 
 	@Test
+	void emphasisChangesWithTheMeetingTypeButTheRequestedShapeDoesNot() {
+		mockServer.expect(requestTo(containsString("/chat/completions")))
+				.andExpect(content().string(containsString("daily/alinhamento de time")))
+				// A estrutura pedida é a mesma em todos os tipos: só a ênfase muda.
+				.andExpect(content().string(containsString("decisao, proximo_passo, valor_mencionado")))
+				.andRespond(withSuccess(chatResponse("""
+						{"summary": "Resumo", "items": []}
+						"""), MediaType.APPLICATION_JSON));
+
+		provider.summarize(TRANSCRIPTION, MeetingType.DAILY);
+
+		mockServer.verify();
+	}
+
+	@Test
+	void closingMeetingAsksTheModelToPrioritiseValues() {
+		mockServer.expect(requestTo(containsString("/chat/completions")))
+				.andExpect(content().string(containsString("fechamento de negócio")))
+				.andRespond(withSuccess(chatResponse("""
+						{"summary": "Resumo", "items": []}
+						"""), MediaType.APPLICATION_JSON));
+
+		provider.summarize(TRANSCRIPTION, MeetingType.FECHAMENTO);
+
+		mockServer.verify();
+	}
+
+	@Test
+	void fallsBackToTheGenericEmphasisWhenTypeIsMissing() {
+		mockServer.expect(requestTo(containsString("/chat/completions")))
+				.andExpect(content().string(containsString("pauta variada")))
+				.andRespond(withSuccess(chatResponse("""
+						{"summary": "Resumo", "items": []}
+						"""), MediaType.APPLICATION_JSON));
+
+		provider.summarize(TRANSCRIPTION, null);
+
+		mockServer.verify();
+	}
+
+	@Test
 	void parsesResponseWrappedInMarkdownFence() {
 		String fenced = "```json\n{\"summary\": \"Resumo\", \"items\": []}\n```";
 		mockServer.expect(requestTo(containsString("/chat/completions")))
 				.andRespond(withSuccess(chatResponse(fenced), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRIPTION);
+		SummaryContent content = provider.summarize(TRANSCRIPTION, MeetingType.GENERICA);
 
 		assertThat(content.summary()).isEqualTo("Resumo");
 	}
@@ -169,7 +211,7 @@ class OpenRouterSummaryProviderTest {
 		mockServer.expect(requestTo(containsString("/chat/completions")))
 				.andRespond(withSuccess(chatResponse("isso não é json"), MediaType.APPLICATION_JSON));
 
-		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION))
+		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION, MeetingType.GENERICA))
 				.isInstanceOf(SummaryFormatException.class);
 	}
 
@@ -180,7 +222,7 @@ class OpenRouterSummaryProviderTest {
 						{"summary": "", "items": []}
 						"""), MediaType.APPLICATION_JSON));
 
-		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION))
+		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION, MeetingType.GENERICA))
 				.isInstanceOf(SummaryFormatException.class);
 	}
 
@@ -193,7 +235,7 @@ class OpenRouterSummaryProviderTest {
 						]}
 						"""), MediaType.APPLICATION_JSON));
 
-		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION))
+		assertThatThrownBy(() -> provider.summarize(TRANSCRIPTION, MeetingType.GENERICA))
 				.isInstanceOf(SummaryFormatException.class);
 	}
 

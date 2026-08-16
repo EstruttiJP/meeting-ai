@@ -45,7 +45,7 @@ sempre retorna `400`, nunca chega ao controller.
 | Método | Rota                    | Descrição                                        | Observações |
 |--------|--------------------------|-----------------------------------------------------|-------------|
 | GET    | `/api/meetings`          | Lista as reuniões do usuário (dashboard)              | Sem paginação ainda |
-| POST   | `/api/meetings`          | Upload de arquivo de reunião (multipart: `title`, `file`) | Valida formato (mp3/mp4/wav/m4a) e tamanho antes de checar `UsageQuota`; dispara o pipeline assíncrono (transcrição → resumo) e responde `201` sem esperar terminar |
+| POST   | `/api/meetings`          | Upload de arquivo de reunião (multipart: `title`, `file`, `meetingType`) | `meetingType` é obrigatório (`FECHAMENTO`, `DAILY`, `APRESENTACAO`, `GENERICA`) e muda a ênfase do prompt de extração, não a estrutura dos itens. Valida formato (mp3/mp4/wav/m4a) e tamanho antes de checar `UsageQuota`; dispara o pipeline assíncrono (transcrição → resumo) e responde `201` sem esperar terminar |
 | GET    | `/api/meetings/{id}`     | Detalhe/status de uma reunião                          | `404` se não for do usuário autenticado |
 | GET    | `/api/meetings/{id}/audio` | Áudio original, para o player da tela de revisão      | Servido pela API (nunca por URL direta de storage), então posse e retenção são conferidas a cada request; `410` quando o arquivo já foi apagado pela expiração, para a tela diferenciar "expirou" de "deu erro". Range request ainda não suportado |
 

@@ -11,6 +11,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.transcription.TranscriptionSegment;
 
@@ -66,7 +67,7 @@ class GeminiSummaryProviderTest {
 				.andExpect(header("x-goog-api-key", "user-api-key"))
 				.andRespond(withSuccess(geminiResponse(innerJson), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRICAO, "user-api-key");
+		SummaryContent content = provider.summarize(TRANSCRICAO, MeetingType.GENERICA, "user-api-key");
 
 		assertThat(content.summary()).isEqualTo("Reunião de descoberta");
 		assertThat(content.itemsOfType(SummaryItemType.PROXIMO_PASSO))
@@ -80,7 +81,7 @@ class GeminiSummaryProviderTest {
 		mockServer.expect(requestTo(containsString(":generateContent")))
 				.andRespond(withServerError());
 
-		assertThatThrownBy(() -> provider.summarize(TRANSCRICAO, "user-api-key"))
+		assertThatThrownBy(() -> provider.summarize(TRANSCRICAO, MeetingType.GENERICA, "user-api-key"))
 				.isInstanceOf(SummaryGenerationException.class)
 				.satisfies(ex -> assertThat(rootMessageChain(ex)).doesNotContain("user-api-key"));
 	}

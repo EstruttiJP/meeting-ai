@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 
 import jakarta.validation.Validator;
@@ -32,8 +33,8 @@ public class OpenRouterSummaryProvider extends AbstractLlmSummaryProvider implem
 	}
 
 	@Override
-	public SummaryContent summarize(TranscriptionResult transcription) {
-		String raw = client.complete(apiKey, model, buildPrompt(transcription));
+	public SummaryContent summarize(TranscriptionResult transcription, MeetingType meetingType) {
+		String raw = client.complete(apiKey, model, buildPrompt(transcription, meetingType));
 		return parseAndValidate(raw, transcription.segments());
 	}
 

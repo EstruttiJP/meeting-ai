@@ -49,7 +49,7 @@ class MeetingPipelineStepsTest {
 	void setUp() {
 		steps = new MeetingPipelineSteps(meetingRepository, transcriptionRepository, summaryRepository, JsonMapper.builder().build());
 		User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3");
+		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key-reuniao.mp3", MeetingType.GENERICA);
 		meetingId = UUID.randomUUID();
 	}
 

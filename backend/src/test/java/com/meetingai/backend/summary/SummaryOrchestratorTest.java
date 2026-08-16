@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.aiprovider.AiProviderConfig;
 import com.meetingai.backend.aiprovider.AiProviderConfigRepository;
@@ -61,10 +62,10 @@ class SummaryOrchestratorTest {
 	@Test
 	void usesDefaultProviderWhenUserHasNoAiProviderConfig() {
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of());
-		given(defaultProvider.summarize(TRANSCRICAO)).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO);
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
 	}
@@ -73,10 +74,10 @@ class SummaryOrchestratorTest {
 	void usesDefaultProviderWhenDefaultConfigIsOpenRouter() {
 		AiProviderConfig config = new AiProviderConfig(user, AiProvider.OPENROUTER, null, true);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
-		given(defaultProvider.summarize(TRANSCRICAO)).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO);
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
 	}
@@ -86,25 +87,25 @@ class SummaryOrchestratorTest {
 		AiProviderConfig config = new AiProviderConfig(user, AiProvider.GEMINI, "encrypted-key", true);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
 		given(encryptionService.decrypt("encrypted-key")).willReturn("plain-key");
-		given(geminiProvider.summarize(TRANSCRICAO, "plain-key")).willReturn(expectedContent);
+		given(geminiProvider.summarize(TRANSCRICAO, MeetingType.GENERICA, "plain-key")).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO);
+		SummaryContent result = orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
 		assertThat(result).isEqualTo(expectedContent);
-		verify(defaultProvider, never()).summarize(any());
+		verify(defaultProvider, never()).summarize(any(), any());
 	}
 
 	@Test
 	void ignoresNonDefaultConfigsAndFallsBackToDefaultProvider() {
 		AiProviderConfig nonDefault = new AiProviderConfig(user, AiProvider.GEMINI, "encrypted-key", false);
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(nonDefault));
-		given(defaultProvider.summarize(TRANSCRICAO)).willReturn(expectedContent);
+		given(defaultProvider.summarize(TRANSCRICAO, MeetingType.GENERICA)).willReturn(expectedContent);
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		orchestrator.summarize(user, TRANSCRICAO);
+		orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA);
 
-		verify(geminiProvider, never()).summarize(any(), any());
+		verify(geminiProvider, never()).summarize(any(), any(), any());
 	}
 
 	@Test
@@ -113,7 +114,7 @@ class SummaryOrchestratorTest {
 		given(aiProviderConfigRepository.findByUserId(user.getId())).willReturn(List.of(config));
 		SummaryOrchestrator orchestrator = orchestratorWith(openAiProvider, geminiProvider);
 
-		assertThatThrownBy(() -> orchestrator.summarize(user, TRANSCRICAO))
+		assertThatThrownBy(() -> orchestrator.summarize(user, TRANSCRICAO, MeetingType.GENERICA))
 				.isInstanceOf(SummaryGenerationException.class);
 	}
 

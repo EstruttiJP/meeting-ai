@@ -13,6 +13,10 @@ public class MeetingUploadRequest {
 	@NotNull
 	private MultipartFile file;
 
+	/** Escolhido antes de anexar o arquivo; muda a ênfase do prompt de extração. */
+	@NotNull
+	private MeetingType meetingType;
+
 	public String getTitle() {
 		return title;
 	}
@@ -27,6 +31,14 @@ public class MeetingUploadRequest {
 
 	public void setFile(MultipartFile file) {
 		this.file = file;
+	}
+
+	public MeetingType getMeetingType() {
+		return meetingType;
+	}
+
+	public void setMeetingType(MeetingType meetingType) {
+		this.meetingType = meetingType;
 	}
 
 }

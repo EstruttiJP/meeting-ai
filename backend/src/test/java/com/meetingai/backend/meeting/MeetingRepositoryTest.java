@@ -28,7 +28,7 @@ class MeetingRepositoryTest {
 	void savesAndFindsMeetingsByUser() {
 		User user = userRepository.saveAndFlush(
 				new User("google-sub-meeting", "meeting@meetingai.com", "Meeting User", null));
-		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "meetings/reuniao.mp3");
+		Meeting meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "meetings/reuniao.mp3", MeetingType.GENERICA);
 
 		meetingRepository.saveAndFlush(meeting);
 
@@ -43,15 +43,15 @@ class MeetingRepositoryTest {
 		User user = userRepository.saveAndFlush(
 				new User("google-sub-expiration", "expiration@meetingai.com", "Expiration User", null));
 
-		Meeting overdue = new Meeting(user, "Reunião vencida", "a.mp3", "meetings/a.mp3");
+		Meeting overdue = new Meeting(user, "Reunião vencida", "a.mp3", "meetings/a.mp3", MeetingType.GENERICA);
 		overdue.scheduleExpiration(Instant.now().minus(1, ChronoUnit.DAYS));
 		meetingRepository.saveAndFlush(overdue);
 
-		Meeting notYetDue = new Meeting(user, "Reunião recente", "b.mp3", "meetings/b.mp3");
+		Meeting notYetDue = new Meeting(user, "Reunião recente", "b.mp3", "meetings/b.mp3", MeetingType.GENERICA);
 		notYetDue.scheduleExpiration(Instant.now().plus(5, ChronoUnit.DAYS));
 		meetingRepository.saveAndFlush(notYetDue);
 
-		Meeting alreadyExpired = new Meeting(user, "Reunião já expirada", "c.mp3", "meetings/c.mp3");
+		Meeting alreadyExpired = new Meeting(user, "Reunião já expirada", "c.mp3", "meetings/c.mp3", MeetingType.GENERICA);
 		alreadyExpired.scheduleExpiration(Instant.now().minus(10, ChronoUnit.DAYS));
 		alreadyExpired.markExpired();
 		meetingRepository.saveAndFlush(alreadyExpired);

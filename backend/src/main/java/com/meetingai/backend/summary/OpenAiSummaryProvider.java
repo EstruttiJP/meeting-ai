@@ -6,6 +6,7 @@ import org.springframework.web.client.RestClient;
 
 import com.meetingai.backend.aiprovider.AiProvider;
 
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 
 import jakarta.validation.Validator;
@@ -32,8 +33,8 @@ public class OpenAiSummaryProvider extends AbstractLlmSummaryProvider implements
 	}
 
 	@Override
-	public SummaryContent summarize(TranscriptionResult transcription, String apiKey) {
-		String raw = client.complete(apiKey, model, buildPrompt(transcription));
+	public SummaryContent summarize(TranscriptionResult transcription, MeetingType meetingType, String apiKey) {
+		String raw = client.complete(apiKey, model, buildPrompt(transcription, meetingType));
 		return parseAndValidate(raw, transcription.segments());
 	}
 

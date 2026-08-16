@@ -40,7 +40,7 @@ class MeetingExpirationJobTest {
 	@Test
 	void expiresMeetingsPastRetentionAndDeletesTheirFiles() {
 		User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		Meeting overdue = new Meeting(user, "Reunião antiga", "reuniao.mp3", "user-1/key.mp3");
+		Meeting overdue = new Meeting(user, "Reunião antiga", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		overdue.scheduleExpiration(Instant.now().minus(1, ChronoUnit.DAYS));
 		given(meetingRepository.findByStatusNotAndExpiresAtBefore(eq(MeetingStatus.EXPIRED), any(Instant.class)))
 				.willReturn(List.of(overdue));
@@ -55,7 +55,7 @@ class MeetingExpirationJobTest {
 	@Test
 	void stillMarksExpiredWhenFileDeletionFails() {
 		User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		Meeting overdue = new Meeting(user, "Reunião antiga", "reuniao.mp3", "user-1/key.mp3");
+		Meeting overdue = new Meeting(user, "Reunião antiga", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		overdue.scheduleExpiration(Instant.now().minus(1, ChronoUnit.DAYS));
 		given(meetingRepository.findByStatusNotAndExpiresAtBefore(eq(MeetingStatus.EXPIRED), any(Instant.class)))
 				.willReturn(List.of(overdue));

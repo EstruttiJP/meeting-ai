@@ -8,6 +8,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
 import com.meetingai.backend.meeting.Meeting;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.meeting.MeetingRepository;
 import com.meetingai.backend.user.User;
 import com.meetingai.backend.user.UserRepository;
@@ -32,7 +33,7 @@ class SummaryRepositoryTest {
 		User user = userRepository.saveAndFlush(
 				new User("google-sub-summary", "summary@meetingai.com", "Summary User", null));
 		Meeting meeting = meetingRepository.saveAndFlush(
-				new Meeting(user, "Reunião de vendas", "reuniao.mp3", "meetings/reuniao.mp3"));
+				new Meeting(user, "Reunião de vendas", "reuniao.mp3", "meetings/reuniao.mp3", MeetingType.GENERICA));
 		String json = """
 				{"summary":"Cliente interessado no plano anual","decisions":["Enviar proposta"]}
 				""".trim();

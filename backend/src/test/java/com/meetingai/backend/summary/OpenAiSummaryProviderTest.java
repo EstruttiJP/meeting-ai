@@ -10,6 +10,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.transcription.TranscriptionSegment;
 
@@ -58,7 +59,7 @@ class OpenAiSummaryProviderTest {
 		mockServer.expect(requestTo(containsString("/chat/completions")))
 				.andRespond(withSuccess(objectMapper.writeValueAsString(body), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize(TRANSCRICAO, "user-api-key");
+		SummaryContent content = provider.summarize(TRANSCRICAO, MeetingType.GENERICA, "user-api-key");
 
 		assertThat(content.summary()).isEqualTo("Follow-up agendado");
 	}

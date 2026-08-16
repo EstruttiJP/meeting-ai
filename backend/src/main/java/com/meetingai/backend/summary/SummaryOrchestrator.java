@@ -11,6 +11,7 @@ import com.meetingai.backend.aiprovider.AiProvider;
 import com.meetingai.backend.aiprovider.AiProviderConfig;
 import com.meetingai.backend.aiprovider.AiProviderConfigRepository;
 import com.meetingai.backend.crypto.EncryptionService;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.user.User;
 
@@ -39,22 +40,23 @@ public class SummaryOrchestrator {
 		this.encryptionService = encryptionService;
 	}
 
-	public SummaryContent summarize(User user, TranscriptionResult transcription) {
+	public SummaryContent summarize(User user, TranscriptionResult transcription, MeetingType meetingType) {
 		return aiProviderConfigRepository.findByUserId(user.getId()).stream()
 				.filter(AiProviderConfig::isDefault)
 				.findFirst()
 				.filter(config -> config.getProvider() != AiProvider.OPENROUTER)
-				.map(config -> summarizeWithUserKey(config, transcription))
-				.orElseGet(() -> defaultProvider.summarize(transcription));
+				.map(config -> summarizeWithUserKey(config, transcription, meetingType))
+				.orElseGet(() -> defaultProvider.summarize(transcription, meetingType));
 	}
 
-	private SummaryContent summarizeWithUserKey(AiProviderConfig config, TranscriptionResult transcription) {
+	private SummaryContent summarizeWithUserKey(AiProviderConfig config, TranscriptionResult transcription,
+			MeetingType meetingType) {
 		UserKeySummaryProvider provider = userKeyProviders.get(config.getProvider());
 		if (provider == null) {
 			throw new SummaryGenerationException("Provider de IA não suportado: " + config.getProvider());
 		}
 		String apiKey = encryptionService.decrypt(config.getApiKeyEncrypted());
-		return provider.summarize(transcription, apiKey);
+		return provider.summarize(transcription, meetingType, apiKey);
 	}
 
 }

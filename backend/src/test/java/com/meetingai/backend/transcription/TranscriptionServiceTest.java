@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.meetingai.backend.meeting.Meeting;
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.meeting.MeetingAccessService;
 import com.meetingai.backend.user.User;
 
@@ -36,7 +37,7 @@ class TranscriptionServiceTest {
 	void setUp() {
 		transcriptionService = new TranscriptionService(meetingAccessService, transcriptionRepository);
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3");
+		meeting = new Meeting(user, "Reunião de vendas", "reuniao.mp3", "user-1/key.mp3", MeetingType.GENERICA);
 		meetingId = UUID.randomUUID();
 		ReflectionTestUtils.setField(meeting, "id", meetingId);
 	}

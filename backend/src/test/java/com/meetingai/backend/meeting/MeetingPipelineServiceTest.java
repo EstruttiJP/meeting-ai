@@ -71,7 +71,7 @@ class MeetingPipelineServiceTest {
 		meetingId = UUID.randomUUID();
 		userId = UUID.randomUUID();
 		user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
-		context = new PipelineContext("user-1/key-reuniao.mp3", "reuniao.mp3", userId);
+		context = new PipelineContext("user-1/key-reuniao.mp3", "reuniao.mp3", userId, MeetingType.DAILY);
 	}
 
 	@Test
@@ -82,7 +82,7 @@ class MeetingPipelineServiceTest {
 		given(transcriptionProvider.providerName()).willReturn("whisper-local");
 		given(userRepository.findById(userId)).willReturn(Optional.of(user));
 		SummaryContent summaryContent = new SummaryContent("resumo", List.of());
-		given(summaryOrchestrator.summarize(user, TRANSCRICAO)).willReturn(summaryContent);
+		given(summaryOrchestrator.summarize(user, TRANSCRICAO, MeetingType.DAILY)).willReturn(summaryContent);
 
 		pipelineService.process(meetingId);
 
@@ -122,7 +122,7 @@ class MeetingPipelineServiceTest {
 		givenTranscriptionSucceeded();
 		willThrow(new SummaryGenerationException("Falha ao chamar a API de IA",
 				new IllegalStateException("402 Payment Required")))
-				.given(summaryOrchestrator).summarize(user, TRANSCRICAO);
+				.given(summaryOrchestrator).summarize(user, TRANSCRICAO, MeetingType.DAILY);
 
 		pipelineService.process(meetingId);
 
@@ -137,7 +137,7 @@ class MeetingPipelineServiceTest {
 	void marksFailedWithInvalidFormatCategoryWhenModelBreaksTheSchema() {
 		givenTranscriptionSucceeded();
 		willThrow(new SummaryFormatException("Resposta bruta: desculpe, não consigo ajudar"))
-				.given(summaryOrchestrator).summarize(user, TRANSCRICAO);
+				.given(summaryOrchestrator).summarize(user, TRANSCRICAO, MeetingType.DAILY);
 
 		pipelineService.process(meetingId);
 

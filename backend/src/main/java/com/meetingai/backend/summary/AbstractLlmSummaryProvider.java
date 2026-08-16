@@ -5,9 +5,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.meetingai.backend.meeting.MeetingType;
 import com.meetingai.backend.transcription.TranscriptionResult;
 import com.meetingai.backend.transcription.TranscriptionSegment;
 
@@ -56,6 +58,8 @@ abstract class AbstractLlmSummaryProvider {
 			converta [MM:SS] para segundos (ex.: [01:30] vira 90). Use sempre o tempo de uma linha que existe \
 			na transcrição; nunca estime ou invente um tempo que não venha de uma linha.
 
+			%s
+
 			Transcrição:
 			%s
 			""";
@@ -70,8 +74,34 @@ abstract class AbstractLlmSummaryProvider {
 		this.validator = validator;
 	}
 
-	protected String buildPrompt(TranscriptionResult transcription) {
-		return PROMPT_TEMPLATE.formatted(formatTranscript(transcription));
+	/**
+	 * A ênfase por tipo de reunião muda o que o modelo deve caçar com mais peso,
+	 * nunca a estrutura do resultado — os quatro tipos de item continuam os
+	 * mesmos, e o JSON pedido é idêntico em todos os casos.
+	 */
+	private static final Map<MeetingType, String> EMPHASIS_BY_TYPE = Map.of(
+			MeetingType.FECHAMENTO, """
+					Esta é uma reunião de fechamento de negócio. Priorize valores, condições comerciais, \
+					prazos e o que foi de fato acordado: valor_mencionado e decisao são os tipos mais \
+					importantes aqui. Registre como ponto_atencao qualquer hesitação ou objeção do cliente.""",
+			MeetingType.DAILY, """
+					Esta é uma daily/alinhamento de time. Priorize o que cada pessoa ficou de fazer e o que \
+					está travando o trabalho: proximo_passo e ponto_atencao são os tipos mais importantes \
+					aqui. Não force valor_mencionado — números soltos numa daily raramente têm peso, então \
+					só registre um valor se ele for claramente relevante (um prazo firmado, por exemplo).""",
+			MeetingType.APRESENTACAO, """
+					Esta é uma apresentação/pitch. Priorize as decisões tomadas depois da apresentação e as \
+					dúvidas e objeções levantadas pela audiência: decisao e ponto_atencao são os tipos mais \
+					importantes aqui. Registre valores só quando fizerem parte de uma proposta concreta.""",
+			MeetingType.GENERICA, """
+					Esta é uma reunião de pauta variada. Trate os quatro tipos de item com o mesmo peso e \
+					extraia o que realmente aparecer na conversa.""");
+
+	protected String buildPrompt(TranscriptionResult transcription, MeetingType meetingType) {
+		String emphasis = EMPHASIS_BY_TYPE.getOrDefault(
+				meetingType == null ? MeetingType.GENERICA : meetingType,
+				EMPHASIS_BY_TYPE.get(MeetingType.GENERICA));
+		return PROMPT_TEMPLATE.formatted(emphasis, formatTranscript(transcription));
 	}
 
 	/**

@@ -54,7 +54,7 @@ public class MeetingController {
 	@PostMapping(consumes = "multipart/form-data")
 	public ResponseEntity<MeetingResponse> upload(@Valid @ModelAttribute MeetingUploadRequest request) {
 		User user = currentUserService.getCurrentUser();
-		Meeting meeting = meetingUploadService.upload(user, request.getTitle(), request.getFile());
+		Meeting meeting = meetingUploadService.upload(user, request.getTitle(), request.getFile(), request.getMeetingType());
 		// Dispara o pipeline em segundo plano — a resposta não espera transcrição/resumo terminar.
 		meetingPipelineService.process(meeting.getId());
 		return ResponseEntity.status(HttpStatus.CREATED).body(MeetingResponse.from(meeting));
