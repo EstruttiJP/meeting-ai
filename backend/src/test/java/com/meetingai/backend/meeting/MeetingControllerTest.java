@@ -47,6 +47,9 @@ class MeetingControllerTest {
 	@MockitoBean
 	private MeetingAccessService meetingAccessService;
 
+	@MockitoBean
+	private MeetingAudioService meetingAudioService;
+
 	private final User user = new User("google-sub-1", "dev@meetingai.com", "Dev User", null);
 
 	@Test
