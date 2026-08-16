@@ -20,6 +20,7 @@ describe('Dashboard', () => {
     uploadedAt: new Date().toISOString(),
     expiresAt: null,
     sentToCrmAt: null,
+    meetingType: 'GENERICA',
     failureCategory: null,
   };
 

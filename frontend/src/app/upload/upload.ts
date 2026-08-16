@@ -5,6 +5,7 @@ import { Button } from 'primeng/button';
 import { ProgressBar } from 'primeng/progressbar';
 
 import { toAppError } from '../core/http/to-app-error';
+import { MEETING_TYPE_OPTIONS, MeetingType } from '../core/models/meeting.model';
 import { UsageQuota } from '../core/models/usage-quota.model';
 import { MeetingsService } from '../core/services/meetings.service';
 import { UsageQuotaService } from '../core/services/usage-quota.service';
@@ -43,6 +44,13 @@ export class Upload {
     return Math.min(100, Math.round((q.meetingsUploaded / q.meetingsLimit) * 100));
   });
 
+  /**
+   * Escolhido antes de anexar o arquivo: o tipo muda a ênfase da extração, e
+   * pedir depois do upload seria tarde — o pipeline já teria começado.
+   */
+  protected readonly meetingType = signal<MeetingType | null>(null);
+  protected readonly typeOptions = MEETING_TYPE_OPTIONS;
+
   protected readonly isDraggingOver = signal(false);
   protected readonly selectedFile = signal<File | null>(null);
   protected readonly fileError = signal<string | null>(null);
@@ -51,9 +59,13 @@ export class Upload {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
+  /** Sem tipo escolhido não dá para anexar: a ordem faz parte do fluxo pedido. */
+  protected readonly canPickFile = computed(() => this.meetingType() !== null && !this.quotaExhausted());
+
   protected readonly canSubmit = computed(
     () =>
       !!this.selectedFile() &&
+      this.meetingType() !== null &&
       this.title.trim().length > 0 &&
       !this.quotaExhausted() &&
       !this.submitting(),
@@ -91,7 +103,7 @@ export class Upload {
     event.preventDefault();
     this.isDraggingOver.set(false);
     const file = event.dataTransfer?.files?.[0];
-    if (file) {
+    if (file && this.canPickFile()) {
       this.handleFile(file);
     }
   }
@@ -104,6 +116,9 @@ export class Upload {
   }
 
   protected browseFiles() {
+    if (!this.canPickFile()) {
+      return;
+    }
     this.fileInput().nativeElement.click();
   }
 
@@ -134,7 +149,7 @@ export class Upload {
     }
     this.submitting.set(true);
     this.submitError.set(null);
-    this.meetingsService.upload(this.title.trim(), file).subscribe({
+    this.meetingsService.upload(this.title.trim(), file, this.meetingType()!).subscribe({
       next: (meeting) => {
         this.submitting.set(false);
         this.router.navigate(['/meetings', meeting.id, 'progress']);

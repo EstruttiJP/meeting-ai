@@ -29,6 +29,7 @@ describe('MeetingsService', () => {
         uploadedAt: new Date().toISOString(),
         expiresAt: null,
         sentToCrmAt: null,
+        meetingType: 'GENERICA',
         failureCategory: null,
       },
     ];
@@ -53,11 +54,12 @@ describe('MeetingsService', () => {
       uploadedAt: new Date().toISOString(),
       expiresAt: null,
       sentToCrmAt: null,
+      meetingType: 'GENERICA',
       failureCategory: null,
     };
 
     let result: Meeting | undefined;
-    service.upload('Nova reunião', file).subscribe((response) => (result = response));
+    service.upload('Nova reunião', file, 'FECHAMENTO').subscribe((response) => (result = response));
 
     const req = httpMock.expectOne('http://localhost:8080/api/meetings');
     expect(req.request.method).toBe('POST');
@@ -65,6 +67,7 @@ describe('MeetingsService', () => {
     const body = req.request.body as FormData;
     expect(body.get('title')).toBe('Nova reunião');
     expect(body.get('file')).toBe(file);
+    expect(body.get('meetingType')).toBe('FECHAMENTO');
     req.flush(created);
 
     expect(result).toEqual(created);
@@ -79,6 +82,7 @@ describe('MeetingsService', () => {
       uploadedAt: new Date().toISOString(),
       expiresAt: null,
       sentToCrmAt: null,
+      meetingType: 'GENERICA',
       failureCategory: null,
     };
 

@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { Meeting } from '../models/meeting.model';
+import { Meeting, MeetingType } from '../models/meeting.model';
 
 @Injectable({ providedIn: 'root' })
 export class MeetingsService {
@@ -26,10 +26,11 @@ export class MeetingsService {
     return `${environment.apiBaseUrl}/api/meetings/${id}/audio`;
   }
 
-  upload(title: string, file: File): Observable<Meeting> {
+  upload(title: string, file: File, meetingType: MeetingType): Observable<Meeting> {
     const formData = new FormData();
     formData.append('title', title);
     formData.append('file', file);
+    formData.append('meetingType', meetingType);
     return this.http.post<Meeting>(`${environment.apiBaseUrl}/api/meetings`, formData);
   }
 }
