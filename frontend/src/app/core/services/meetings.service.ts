@@ -17,6 +17,15 @@ export class MeetingsService {
     return this.http.get<Meeting>(`${environment.apiBaseUrl}/api/meetings/${id}`);
   }
 
+  /**
+   * URL do áudio original para o elemento <audio>. É o próprio endpoint da API
+   * (autenticado por cookie de sessão), não a URL de storage — por isso a tag
+   * precisa de crossorigin="use-credentials" para mandar o cookie.
+   */
+  audioUrl(id: string): string {
+    return `${environment.apiBaseUrl}/api/meetings/${id}/audio`;
+  }
+
   upload(title: string, file: File): Observable<Meeting> {
     const formData = new FormData();
     formData.append('title', title);

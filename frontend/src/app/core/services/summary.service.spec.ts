@@ -11,11 +11,7 @@ describe('SummaryService', () => {
 
   const CONTENT: SummaryContent = {
     summary: 'Resumo',
-    decisions: ['Decisão'],
-    nextSteps: null,
-    mentionedValues: null,
-    paymentMethod: null,
-    objections: null,
+    items: [{ id: 'item-1', type: 'decisao', content: 'Decisão', timestampSeconds: 12 }],
   };
 
   const SUMMARY: Summary = {
@@ -59,6 +55,41 @@ describe('SummaryService', () => {
     req.flush(approved);
 
     expect(result).toEqual(approved);
+  });
+
+  it('updateText() patches only the summary text', () => {
+    service.updateText('m1', 'Resumo reescrito').subscribe();
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ summary: 'Resumo reescrito' });
+    req.flush(SUMMARY);
+  });
+
+  it('addItem() posts to the items sub-resource', () => {
+    service.addItem('m1', { type: 'decisao', content: 'Novo', timestampSeconds: 5 }).subscribe();
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary/items');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ type: 'decisao', content: 'Novo', timestampSeconds: 5 });
+    req.flush(SUMMARY);
+  });
+
+  it('updateItem() patches a single item by id', () => {
+    service.updateItem('m1', 'item-1', 'Corrigido').subscribe();
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary/items/item-1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ content: 'Corrigido' });
+    req.flush(SUMMARY);
+  });
+
+  it('removeItem() deletes a single item by id', () => {
+    service.removeItem('m1', 'item-1').subscribe();
+
+    const req = httpMock.expectOne('http://localhost:8080/api/meetings/m1/summary/items/item-1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(SUMMARY);
   });
 
   it('sendToCrm() posts to the send-to-crm endpoint', () => {
