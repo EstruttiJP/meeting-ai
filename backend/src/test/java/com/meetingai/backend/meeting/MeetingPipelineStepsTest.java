@@ -70,7 +70,7 @@ class MeetingPipelineStepsTest {
 	void saveTranscriptionAndMarkSummarizingPersistsTranscriptionAndUpdatesStatus() {
 		when(meetingRepository.getReferenceById(meetingId)).thenReturn(meeting);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
-		TranscriptionResult result = new TranscriptionResult("transcrição completa", "pt");
+		TranscriptionResult result = new TranscriptionResult("transcrição completa", "pt", List.of());
 
 		steps.saveTranscriptionAndMarkSummarizing(meetingId, result, "whisper-local");
 
@@ -83,7 +83,7 @@ class MeetingPipelineStepsTest {
 	void saveSummaryAndMarkReadyPersistsSummaryJsonAndMarksReady() {
 		when(meetingRepository.getReferenceById(meetingId)).thenReturn(meeting);
 		given(meetingRepository.findById(meetingId)).willReturn(Optional.of(meeting));
-		SummaryContent content = new SummaryContent("resumo objetivo", List.of("decisão 1"), List.of(), List.of(), null, List.of());
+		SummaryContent content = new SummaryContent("resumo objetivo", List.of());
 
 		steps.saveSummaryAndMarkReady(meetingId, content);
 

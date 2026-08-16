@@ -11,6 +11,8 @@ import org.springframework.web.client.RestClientException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.meetingai.backend.aiprovider.AiProvider;
 
+import com.meetingai.backend.transcription.TranscriptionResult;
+
 import jakarta.validation.Validator;
 import tools.jackson.databind.ObjectMapper;
 
@@ -38,8 +40,8 @@ public class ClaudeSummaryProvider extends AbstractLlmSummaryProvider implements
 	}
 
 	@Override
-	public SummaryContent summarize(String transcriptionText, String apiKey) {
-		String prompt = buildPrompt(transcriptionText);
+	public SummaryContent summarize(TranscriptionResult transcription, String apiKey) {
+		String prompt = buildPrompt(transcription);
 		ClaudeResponse response;
 		try {
 			response = restClient.post()
@@ -53,7 +55,7 @@ public class ClaudeSummaryProvider extends AbstractLlmSummaryProvider implements
 		} catch (RestClientException e) {
 			throw new SummaryGenerationException("Falha ao chamar o Claude", e);
 		}
-		return parseAndValidate(extractText(response));
+		return parseAndValidate(extractText(response), transcription.segments());
 	}
 
 	private String extractText(ClaudeResponse response) {

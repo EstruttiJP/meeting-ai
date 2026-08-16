@@ -12,6 +12,8 @@ import com.meetingai.backend.meeting.MeetingAccessService;
 import com.meetingai.backend.meeting.MeetingRepository;
 import com.meetingai.backend.summary.Summary;
 import com.meetingai.backend.summary.SummaryContent;
+import com.meetingai.backend.summary.SummaryItem;
+import com.meetingai.backend.summary.SummaryItemType;
 import com.meetingai.backend.summary.SummaryNotApprovedException;
 import com.meetingai.backend.summary.SummaryNotFoundException;
 import com.meetingai.backend.summary.SummaryRepository;
@@ -73,25 +75,28 @@ public class CrmSyncService {
 		meetingRepository.save(meeting);
 	}
 
+	/**
+	 * A nota do CRM continua agrupada por tipo, ao contrário da tela de revisão:
+	 * quem lê no Pipedrive quer as decisões juntas, não a ordem cronológica da
+	 * conversa. Os timestamps não vão na nota — só fazem sentido com o áudio ao
+	 * lado, que o CRM não tem.
+	 */
 	private String formatNote(SummaryContent content) {
 		StringBuilder note = new StringBuilder();
 		note.append(content.summary()).append("\n\n");
-		appendSection(note, "Decisões", content.decisions());
-		appendSection(note, "Próximos passos", content.nextSteps());
-		appendSection(note, "Valores mencionados", content.mentionedValues());
-		if (content.paymentMethod() != null && !content.paymentMethod().isBlank()) {
-			note.append("Forma de pagamento: ").append(content.paymentMethod()).append('\n');
-		}
-		appendSection(note, "Objeções", content.objections());
+		appendSection(note, "Decisões", content.itemsOfType(SummaryItemType.DECISAO));
+		appendSection(note, "Próximos passos", content.itemsOfType(SummaryItemType.PROXIMO_PASSO));
+		appendSection(note, "Valores mencionados", content.itemsOfType(SummaryItemType.VALOR_MENCIONADO));
+		appendSection(note, "Pontos de atenção", content.itemsOfType(SummaryItemType.PONTO_ATENCAO));
 		return note.toString();
 	}
 
-	private void appendSection(StringBuilder note, String title, List<String> items) {
+	private void appendSection(StringBuilder note, String title, List<SummaryItem> items) {
 		if (items == null || items.isEmpty()) {
 			return;
 		}
 		note.append(title).append(":\n");
-		items.forEach(item -> note.append("- ").append(item).append('\n'));
+		items.forEach(item -> note.append("- ").append(item.content()).append('\n'));
 		note.append('\n');
 	}
 

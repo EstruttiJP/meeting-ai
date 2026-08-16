@@ -56,6 +56,9 @@ class MeetingPipelineServiceTest {
 	@Captor
 	private ArgumentCaptor<String> reasonCaptor;
 
+	private static final TranscriptionResult TRANSCRICAO =
+			new TranscriptionResult("transcrição da reunião", "pt", List.of());
+
 	private MeetingPipelineService pipelineService;
 	private UUID meetingId;
 	private UUID userId;
@@ -75,16 +78,15 @@ class MeetingPipelineServiceTest {
 	void happyPathTranscribesAndSummarizesThenMarksReady() {
 		given(steps.markTranscribing(meetingId)).willReturn(context);
 		given(storageService.retrieve(context.storageKey())).willReturn(new ByteArrayInputStream("audio".getBytes()));
-		TranscriptionResult transcriptionResult = new TranscriptionResult("transcrição da reunião", "pt");
-		given(transcriptionProvider.transcribe(any(), eq("reuniao.mp3"), anyString())).willReturn(transcriptionResult);
+		given(transcriptionProvider.transcribe(any(), eq("reuniao.mp3"), anyString())).willReturn(TRANSCRICAO);
 		given(transcriptionProvider.providerName()).willReturn("whisper-local");
 		given(userRepository.findById(userId)).willReturn(Optional.of(user));
-		SummaryContent summaryContent = new SummaryContent("resumo", List.of(), List.of(), List.of(), null, List.of());
-		given(summaryOrchestrator.summarize(user, "transcrição da reunião")).willReturn(summaryContent);
+		SummaryContent summaryContent = new SummaryContent("resumo", List.of());
+		given(summaryOrchestrator.summarize(user, TRANSCRICAO)).willReturn(summaryContent);
 
 		pipelineService.process(meetingId);
 
-		verify(steps).saveTranscriptionAndMarkSummarizing(meetingId, transcriptionResult, "whisper-local");
+		verify(steps).saveTranscriptionAndMarkSummarizing(meetingId, TRANSCRICAO, "whisper-local");
 		verify(steps).saveSummaryAndMarkReady(meetingId, summaryContent);
 		verify(steps, never()).markFailed(any(), any(), anyString());
 	}
@@ -120,7 +122,7 @@ class MeetingPipelineServiceTest {
 		givenTranscriptionSucceeded();
 		willThrow(new SummaryGenerationException("Falha ao chamar a API de IA",
 				new IllegalStateException("402 Payment Required")))
-				.given(summaryOrchestrator).summarize(user, "transcrição da reunião");
+				.given(summaryOrchestrator).summarize(user, TRANSCRICAO);
 
 		pipelineService.process(meetingId);
 
@@ -135,7 +137,7 @@ class MeetingPipelineServiceTest {
 	void marksFailedWithInvalidFormatCategoryWhenModelBreaksTheSchema() {
 		givenTranscriptionSucceeded();
 		willThrow(new SummaryFormatException("Resposta bruta: desculpe, não consigo ajudar"))
-				.given(summaryOrchestrator).summarize(user, "transcrição da reunião");
+				.given(summaryOrchestrator).summarize(user, TRANSCRICAO);
 
 		pipelineService.process(meetingId);
 
@@ -148,7 +150,7 @@ class MeetingPipelineServiceTest {
 		given(steps.markTranscribing(meetingId)).willReturn(context);
 		given(storageService.retrieve(context.storageKey())).willReturn(new ByteArrayInputStream("audio".getBytes()));
 		given(transcriptionProvider.transcribe(any(), eq("reuniao.mp3"), anyString()))
-				.willReturn(new TranscriptionResult("transcrição da reunião", "pt"));
+				.willReturn(TRANSCRICAO);
 		given(transcriptionProvider.providerName()).willReturn("whisper-local");
 		given(userRepository.findById(userId)).willReturn(Optional.of(user));
 	}

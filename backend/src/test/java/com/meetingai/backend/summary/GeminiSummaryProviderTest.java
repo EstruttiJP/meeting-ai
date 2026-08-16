@@ -11,6 +11,8 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.transcription.TranscriptionResult;
+import com.meetingai.backend.transcription.TranscriptionSegment;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -34,6 +36,11 @@ class GeminiSummaryProviderTest {
 	private MockRestServiceServer mockServer;
 	private GeminiSummaryProvider provider;
 
+	private static final TranscriptionResult TRANSCRICAO = new TranscriptionResult(
+			"texto completo", "pt",
+			List.of(new TranscriptionSegment(0, 8, "Abertura"),
+					new TranscriptionSegment(30, 38, "Meio da conversa")));
+
 	@BeforeEach
 	void setUp() {
 		RestClient.Builder builder = RestClient.builder();
@@ -50,19 +57,22 @@ class GeminiSummaryProviderTest {
 	@Test
 	void summarizesValidJsonResponse() {
 		String innerJson = """
-				{"summary": "Reunião de descoberta", "decisions": [], "nextSteps": ["Enviar proposta"], \
-				"mentionedValues": [], "paymentMethod": null, "objections": ["Preço alto"]}
+				{"summary": "Reunião de descoberta", "items": [
+				  {"type": "proximo_passo", "content": "Enviar proposta", "timestampSeconds": 30},
+				  {"type": "ponto_atencao", "content": "Preço alto", "timestampSeconds": 0}]}
 				""";
 		mockServer.expect(requestTo(containsString(":generateContent")))
 				.andExpect(method(HttpMethod.POST))
 				.andExpect(header("x-goog-api-key", "user-api-key"))
 				.andRespond(withSuccess(geminiResponse(innerJson), MediaType.APPLICATION_JSON));
 
-		SummaryContent content = provider.summarize("transcrição", "user-api-key");
+		SummaryContent content = provider.summarize(TRANSCRICAO, "user-api-key");
 
 		assertThat(content.summary()).isEqualTo("Reunião de descoberta");
-		assertThat(content.nextSteps()).containsExactly("Enviar proposta");
-		assertThat(content.objections()).containsExactly("Preço alto");
+		assertThat(content.itemsOfType(SummaryItemType.PROXIMO_PASSO))
+				.singleElement().satisfies(item -> assertThat(item.content()).isEqualTo("Enviar proposta"));
+		assertThat(content.itemsOfType(SummaryItemType.PONTO_ATENCAO))
+				.singleElement().satisfies(item -> assertThat(item.content()).isEqualTo("Preço alto"));
 	}
 
 	@Test
@@ -70,7 +80,7 @@ class GeminiSummaryProviderTest {
 		mockServer.expect(requestTo(containsString(":generateContent")))
 				.andRespond(withServerError());
 
-		assertThatThrownBy(() -> provider.summarize("transcrição", "user-api-key"))
+		assertThatThrownBy(() -> provider.summarize(TRANSCRICAO, "user-api-key"))
 				.isInstanceOf(SummaryGenerationException.class)
 				.satisfies(ex -> assertThat(rootMessageChain(ex)).doesNotContain("user-api-key"));
 	}

@@ -1,7 +1,15 @@
 package com.meetingai.backend.summary;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.meetingai.backend.transcription.TranscriptionResult;
+import com.meetingai.backend.transcription.TranscriptionSegment;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -18,21 +26,29 @@ import jakarta.validation.Validator;
 abstract class AbstractLlmSummaryProvider {
 
 	private static final String PROMPT_TEMPLATE = """
-			Você é um assistente que extrai informações estruturadas de transcrições de reuniões comerciais.
-			Analise a transcrição abaixo e devolva SOMENTE um JSON válido (sem texto antes ou depois, sem blocos \
-			de código markdown), exatamente com este formato:
+			Você é um assistente que ajuda a documentar reuniões. Analise a transcrição abaixo e devolva \
+			SOMENTE um JSON válido (sem texto antes ou depois, sem blocos de código markdown), exatamente \
+			com este formato:
 
 			{
 			  "summary": "resumo objetivo da reunião em um parágrafo",
-			  "decisions": ["decisão 1", "decisão 2"],
-			  "nextSteps": ["próximo passo 1", "próximo passo 2"],
-			  "mentionedValues": ["valor mencionado 1", "valor mencionado 2"],
-			  "paymentMethod": "forma de pagamento citada, ou null se não houver",
-			  "objections": ["objeção 1", "objeção 2"]
+			  "items": [
+			    {"type": "decisao", "content": "o que foi decidido", "timestampSeconds": 12},
+			    {"type": "proximo_passo", "content": "o que ficou combinado fazer", "timestampSeconds": 45},
+			    {"type": "valor_mencionado", "content": "número, prazo ou valor citado", "timestampSeconds": 60},
+			    {"type": "ponto_atencao", "content": "risco, dúvida ou objeção levantada", "timestampSeconds": 90}
+			  ]
 			}
 
-			Se uma lista não tiver itens, devolva uma lista vazia []. O campo "summary" é obrigatório e nunca \
-			pode ficar vazio.
+			O campo "type" só aceita estes quatro valores: decisao, proximo_passo, valor_mencionado, \
+			ponto_atencao. O campo "summary" é obrigatório e nunca pode ficar vazio. Se a reunião não tiver \
+			nenhum item de um tipo, simplesmente não inclua itens daquele tipo — não invente conteúdo para \
+			preencher.
+
+			Cada linha da transcrição começa com o tempo em que ela foi dita, no formato [MM:SS]. Para cada \
+			item extraído, "timestampSeconds" deve ser o tempo EM SEGUNDOS da linha onde aquilo foi dito — \
+			converta [MM:SS] para segundos (ex.: [01:30] vira 90). Use sempre o tempo de uma linha que existe \
+			na transcrição; nunca estime ou invente um tempo que não venha de uma linha.
 
 			Transcrição:
 			%s
@@ -48,11 +64,30 @@ abstract class AbstractLlmSummaryProvider {
 		this.validator = validator;
 	}
 
-	protected String buildPrompt(String transcriptionText) {
-		return PROMPT_TEMPLATE.formatted(transcriptionText);
+	protected String buildPrompt(TranscriptionResult transcription) {
+		return PROMPT_TEMPLATE.formatted(formatTranscript(transcription));
 	}
 
-	protected SummaryContent parseAndValidate(String rawResponse) {
+	/**
+	 * Sem segmentos (transcrição antiga, ou provider que não devolve tempo) o
+	 * texto vai puro: o modelo continua extraindo itens, só não consegue ancorar
+	 * no áudio, e os timestamps saem nulos na normalização.
+	 */
+	private static String formatTranscript(TranscriptionResult transcription) {
+		if (transcription.segments().isEmpty()) {
+			return transcription.content();
+		}
+		return transcription.segments().stream()
+				.map(segment -> "[%s] %s".formatted(formatTimestamp(segment.startSeconds()), segment.text()))
+				.collect(Collectors.joining("\n"));
+	}
+
+	private static String formatTimestamp(double seconds) {
+		int total = (int) Math.round(seconds);
+		return String.format(Locale.ROOT, "%02d:%02d", total / 60, total % 60);
+	}
+
+	protected SummaryContent parseAndValidate(String rawResponse, List<TranscriptionSegment> segments) {
 		String json = extractJson(rawResponse);
 		SummaryContent content;
 		try {
@@ -62,6 +97,8 @@ abstract class AbstractLlmSummaryProvider {
 					"Resposta do modelo não é um JSON válido no formato esperado. Resposta bruta: "
 							+ truncate(rawResponse), e);
 		}
+		content = normalize(content, segments);
+
 		Set<ConstraintViolation<SummaryContent>> violations = validator.validate(content);
 		if (!violations.isEmpty()) {
 			String campos = violations.stream()
@@ -72,6 +109,46 @@ abstract class AbstractLlmSummaryProvider {
 							+ truncate(rawResponse));
 		}
 		return content;
+	}
+
+	/**
+	 * Ajusta o que o modelo não tem como garantir sozinho: id único por item
+	 * (a edição granular depende disso) e timestamp ancorado num segmento que
+	 * existe de verdade.
+	 */
+	private static SummaryContent normalize(SummaryContent content, List<TranscriptionSegment> segments) {
+		List<SummaryItem> normalized = new ArrayList<>();
+		Set<String> usedIds = new HashSet<>();
+		int nextGeneratedId = 1;
+
+		for (SummaryItem item : content.items()) {
+			String id = item.id();
+			if (id == null || id.isBlank() || !usedIds.add(id)) {
+				while (!usedIds.add("item-" + nextGeneratedId)) {
+					nextGeneratedId++;
+				}
+				id = "item-" + nextGeneratedId;
+			}
+			normalized.add(new SummaryItem(id, item.type(), item.content(),
+					anchorToSegment(item.timestampSeconds(), segments)));
+		}
+		return new SummaryContent(content.summary(), normalized);
+	}
+
+	/**
+	 * Reancora o tempo proposto pelo modelo no início do segmento mais próximo,
+	 * garantindo que todo timestamp salvo veio de um trecho que existe de fato
+	 * na gravação. Sem segmentos não há o que conferir, então o tempo é
+	 * descartado — melhor item sem âncora do que âncora inventada.
+	 */
+	private static Double anchorToSegment(Double proposed, List<TranscriptionSegment> segments) {
+		if (proposed == null || segments == null || segments.isEmpty()) {
+			return null;
+		}
+		return segments.stream()
+				.min(Comparator.comparingDouble(segment -> Math.abs(segment.startSeconds() - proposed)))
+				.map(TranscriptionSegment::startSeconds)
+				.orElse(null);
 	}
 
 	/**

@@ -90,7 +90,7 @@ public class MeetingPipelineService {
 
 		User user = userRepository.findById(context.userId())
 				.orElseThrow(() -> new IllegalStateException("Usuário da reunião não encontrado: " + context.userId()));
-		SummaryContent summaryContent = summaryOrchestrator.summarize(user, transcriptionResult.content());
+		SummaryContent summaryContent = summaryOrchestrator.summarize(user, transcriptionResult);
 		steps.saveSummaryAndMarkReady(meetingId, summaryContent);
 		log.info("Reunião {} resumida e marcada como READY", meetingId);
 	}

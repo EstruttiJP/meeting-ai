@@ -50,7 +50,9 @@ class MeetingPipelineSteps {
 	@Transactional
 	void saveTranscriptionAndMarkSummarizing(UUID meetingId, TranscriptionResult result, String providerName) {
 		Meeting meetingRef = meetingRepository.getReferenceById(meetingId);
-		transcriptionRepository.save(new Transcription(meetingRef, result.content(), result.language(), providerName));
+		String segmentsJson = result.segments().isEmpty() ? null : objectMapper.writeValueAsString(result.segments());
+		transcriptionRepository.save(
+				new Transcription(meetingRef, result.content(), result.language(), providerName, segmentsJson));
 
 		Meeting meeting = getMeetingOrThrow(meetingId);
 		meeting.markSummarizing();

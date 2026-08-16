@@ -49,7 +49,7 @@ class SummaryControllerTest {
 	@Test
 	void getReturnsSummaryForOwnedMeeting() {
 		UUID meetingId = UUID.randomUUID();
-		SummaryContent content = new SummaryContent("Cliente interessado", List.of(), List.of(), List.of(), null, List.of());
+		SummaryContent content = new SummaryContent("Cliente interessado", List.of());
 		SummaryResponse response = new SummaryResponse(UUID.randomUUID(), meetingId, content, false, null);
 		given(currentUserService.getCurrentUser()).willReturn(user);
 		given(summaryService.getForMeeting(user, meetingId)).willReturn(response);
@@ -74,7 +74,7 @@ class SummaryControllerTest {
 	@Test
 	void updateWithValidBodyApprovesAndReturnsUpdatedSummary() {
 		UUID meetingId = UUID.randomUUID();
-		SummaryContent editedContent = new SummaryContent("Cliente muito interessado", List.of(), List.of(), List.of(), null, List.of());
+		SummaryContent editedContent = new SummaryContent("Cliente muito interessado", List.of());
 		SummaryResponse response = new SummaryResponse(UUID.randomUUID(), meetingId, editedContent, true, java.time.Instant.now());
 		given(currentUserService.getCurrentUser()).willReturn(user);
 		given(summaryService.approve(any(User.class), org.mockito.ArgumentMatchers.eq(meetingId), any(SummaryContent.class)))

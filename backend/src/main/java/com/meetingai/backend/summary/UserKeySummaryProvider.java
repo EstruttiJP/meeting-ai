@@ -1,6 +1,7 @@
 package com.meetingai.backend.summary;
 
 import com.meetingai.backend.aiprovider.AiProvider;
+import com.meetingai.backend.transcription.TranscriptionResult;
 
 /**
  * Gera o resumo estruturado usando a chave de API que o próprio usuário
@@ -11,6 +12,6 @@ public interface UserKeySummaryProvider {
 
 	AiProvider supportedProvider();
 
-	SummaryContent summarize(String transcriptionText, String apiKey);
+	SummaryContent summarize(TranscriptionResult transcription, String apiKey);
 
 }
