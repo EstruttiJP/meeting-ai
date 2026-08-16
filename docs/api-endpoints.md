@@ -47,6 +47,7 @@ sempre retorna `400`, nunca chega ao controller.
 | GET    | `/api/meetings`          | Lista as reuniões do usuário (dashboard)              | Sem paginação ainda |
 | POST   | `/api/meetings`          | Upload de arquivo de reunião (multipart: `title`, `file`) | Valida formato (mp3/mp4/wav/m4a) e tamanho antes de checar `UsageQuota`; dispara o pipeline assíncrono (transcrição → resumo) e responde `201` sem esperar terminar |
 | GET    | `/api/meetings/{id}`     | Detalhe/status de uma reunião                          | `404` se não for do usuário autenticado |
+| GET    | `/api/meetings/{id}/audio` | Áudio original, para o player da tela de revisão      | Servido pela API (nunca por URL direta de storage), então posse e retenção são conferidas a cada request; `410` quando o arquivo já foi apagado pela expiração, para a tela diferenciar "expirou" de "deu erro". Range request ainda não suportado |
 
 ## Transcription
 
@@ -60,7 +61,18 @@ sempre retorna `400`, nunca chega ao controller.
 |--------|-----------------------------------------------|---------------------------------------------------------|-------------|
 | GET    | `/api/meetings/{id}/summary`                  | Resumo estruturado gerado pelo LLM                        | `404` se o resumo ainda não existe |
 | PUT    | `/api/meetings/{id}/summary`                  | Edição do resumo pelo usuário — é a própria revisão humana, aprova ao salvar | Não existe endpoint de "aprovar" separado; PUT edita e aprova numa tacada só |
+| PATCH  | `/api/meetings/{id}/summary`                  | Edita só o texto corrido do resumo, sem tocar nos itens | Não aprova |
+| POST   | `/api/meetings/{id}/summary/items`            | Adiciona um item à mão (`type`, `content`, `timestampSeconds`) | O `id` é gerado no servidor, para não colidir com os ids vindos do modelo |
+| PATCH  | `/api/meetings/{id}/summary/items/{itemId}`   | Corrige o texto de um item | Tipo e timestamp não mudam: o timestamp está ancorado num trecho real do áudio |
+| DELETE | `/api/meetings/{id}/summary/items/{itemId}`   | Remove um item | `404` se o item não existir (tela desatualizada) |
 | POST   | `/api/meetings/{id}/summary/send-to-crm`      | Envia o resumo aprovado para o CRM (cria negócio + nota no Pipedrive) | `409` se o resumo não estiver aprovado; `400` se não houver CRM conectado; nunca dispara sozinho, só a partir desta chamada explícita |
+
+O conteúdo do resumo é um texto livre (`summary`) mais uma lista plana de itens
+tipados (`items`), cada um com `id`, `type` (`decisao`, `proximo_passo`,
+`valor_mencionado`, `ponto_atencao`), `content` e `timestampSeconds` — o ponto da
+gravação em que aquilo foi dito, sempre ancorado num segmento real da
+transcrição, ou `null` quando não foi possível ancorar. Os endpoints por item
+existem para que corrigir uma decisão não reescreva o resumo inteiro junto.
 
 ## Pipeline assíncrono
 
